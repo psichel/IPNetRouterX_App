@@ -1,0 +1,13 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {dismiss = id; download = id; }; 
+            CLASS = CheckForUpdateC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {statusInfo = NSTextField; }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

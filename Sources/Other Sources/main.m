@@ -1,0 +1,120 @@
+//
+//  main.m
+//  IPNetSentryX
+//
+//  Created by Peter Sichel on Wed Jul 24 2002.
+//  Copyright (c) 2002 Sustainable Softworks, Inc. All rights reserved.
+//
+// globals
+int gStartupItem;
+int gMajorVersion = 10;
+int gMinorVersion = 2;
+int gMinorMinorVersion = 8;
+NSString* ps_nke_name = nil;		// run time name IPNetRouter_NKE
+NSString* ps_kext_name = nil;		// IPNetRouter_NKE.kext
+
+#import <Cocoa/Cocoa.h>
+
+#import <sys/types.h>
+#import "AppDelegate.h"
+#import "unp.h"
+#import <ExceptionHandling/NSExceptionHandler.h>
+#import <pwd.h>
+#import <syslog.h>
+
+#define MY_DEBUG 0
+#if MY_DEBUG
+#import <Foundation/NSDebug.h>
+#endif
+
+int main(int argc, const char *argv[])
+{
+    int result;
+#if MY_DEBUG
+	NSDebugEnabled = YES;		// debug only! ***
+	NSZombieEnabled = YES;
+	NSHangOnUncaughtException = YES;
+	NSDeallocateZombies = NO;
+//#endif
+	// enable exception handling (adds stack trace info to NSException objects)
+	[[NSExceptionHandler defaultExceptionHandler] setExceptionHandlingMask:
+		NSHandleTopLevelExceptionMask |
+		NSLogTopLevelExceptionMask |
+		NSHandleOtherExceptionMask |
+		NSLogOtherExceptionMask];
+#endif
+	// set signal action to ignore software interrupts
+	signal(SIGINT, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
+
+	{	// get system version info
+		SInt32 SystemVersionInHexDigits;
+		int error = Gestalt(gestaltSystemVersion, &SystemVersionInHexDigits);
+		if (error == noErr) {
+			gMinorMinorVersion = SystemVersionInHexDigits & 0xF;
+
+			gMinorVersion = (SystemVersionInHexDigits & 0xF0)/0xF;
+
+			gMajorVersion = ((SystemVersionInHexDigits & 0xF000)/0xF00) * 10 +
+							 (SystemVersionInHexDigits & 0xF00)/0xF0;
+		}
+	}
+	// determine which NKE to use based on Mac OS X version
+	if ((gMajorVersion >= 10) && (gMinorVersion >= 4)) {
+		// Mac OS X Tiger
+		ps_nke_name = PS_TNKE_NAME;
+		[ps_nke_name retain];
+		ps_kext_name = PS_TKEXT_NAME;
+		[ps_kext_name retain];
+	}
+	else {
+		// Mac OS X Jaguar or Panther
+		ps_nke_name = PS_NKE_NAME;
+		[ps_nke_name retain];
+		ps_kext_name = PS_KEXT_NAME;
+		[ps_kext_name retain];
+	}
+
+	// setup to use syslog daemon
+	openlog([PS_PRODUCT_NAME UTF8String], LOG_PID | LOG_PERROR, LOG_DAEMON);
+	
+	// remember if we were launched as a Mac OS X startup item
+	if (argc == 2 && !strcmp(argv[1], "-startup")) {
+		gStartupItem = 1;
+#if 0
+		// if we're root, release unneeded privileges
+		if (geteuid() == 0) {
+			struct passwd *record;
+			record = getpwnam("daemon");		
+			if (record) {
+				seteuid(record->pw_uid);
+				setegid(record->pw_gid);
+			}
+		}
+#endif
+		{
+			NSRunLoop* myRunLoop;
+			// setup autorelease pool
+			NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+			// setup cocoa event handlers
+//			result = NSApplicationLoad();
+			// make sure we have a runloop for the main thread
+			myRunLoop = [NSRunLoop currentRunLoop];
+			// call other cocoa functions (that use DO)
+			[[AppDelegate sharedInstance] applicationDidFinishLaunching:nil];
+			// tell our run loop to run (handle any events)
+			[myRunLoop run];
+			// cleanup
+			[pool release];
+		}
+		result = 0;
+	}
+	else {
+		gStartupItem = 0;
+		//gStartupItem = 1;   // test launch as startup item
+		// invoke Cocoa Application
+		result = NSApplicationMain(argc, argv);
+	}
+	return result;
+}
+

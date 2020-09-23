@@ -1,0 +1,236 @@
+//  ArpTable.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on Thu Jun 10 2004.
+//  Copyright (c) 2004 Sustainable Softworks, Inc. All rights reserved.
+//
+//	Delegate and data source for arp table
+
+#import "ArpTable.h"
+#import "SentryState.h"
+#import "kftSupport.h"
+#import "SystemConfiguration.h"
+
+@implementation ArpTable
+
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+	if (self = [super init]) {
+        // initialize our instance variables
+		arpArray = [[NSMutableArray alloc] init];
+		delegate = nil;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ dealloc
+// ---------------------------------------------------------------------------------
+- (void) dealloc {
+    [arpArray release];	arpArray = nil;
+	[self setDelegate:nil];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeAllObjects
+// ---------------------------------------------------------------------------------
+- (void)removeAllObjects {
+    [arpArray removeAllObjects];
+}
+
+// ---------------------------------------------------------------------------------
+// ¥ delegate
+// ---------------------------------------------------------------------------------
+- (id)delegate { return delegate; }
+- (void)setDelegate:(id)value {
+	//[value retain];
+	//[delegate release];
+	delegate = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ arpArray
+// ---------------------------------------------------------------------------------
+// Get or set underlying NSMutableArray object to examine or update arp list
+- (NSMutableArray *)arpArray { return arpArray; }
+- (void)setArpArray:(NSMutableArray *)value {
+	[value retain];
+	[arpArray release];
+	arpArray = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ arrayOfDictionaries
+// ---------------------------------------------------------------------------------
+// Return as array of dictionaries for export as XML
+- (NSArray *)arrayOfDictionaries {
+	NSEnumerator* en;
+	NSMutableArray* arrayOfDictionaries;
+	ArpEntry* entry;
+	
+	arrayOfDictionaries = [NSMutableArray array];
+	en = [arpArray objectEnumerator];
+	while (entry = [en nextObject]) {
+		[arrayOfDictionaries addObject:[entry nodeDictionary]];
+	}
+	return (NSArray *)arrayOfDictionaries;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ loadArrayOfDictionaries
+// ---------------------------------------------------------------------------------
+- (BOOL)loadArrayOfDictionaries:(NSArray *)inArray
+{
+	int returnValue = YES;
+	NSEnumerator* en;
+	NSDictionary* nodeDictionary;
+	ArpEntry* entry;
+	
+	en = [inArray objectEnumerator];
+	while (nodeDictionary = [en nextObject]) {
+		entry = [ArpEntry entryFromDictionary:nodeDictionary];
+		if (entry) [self addObject:entry];
+	}
+	return returnValue;
+}
+
+#pragma mark -- Access Helpers --
+
+// ---------------------------------------------------------------------------------
+//	¥ addObject:
+// ---------------------------------------------------------------------------------
+// add an object to the end of the Table data array
+// return its index;
+- (int)addObject:(id)entry {
+    int count;
+    count = [arpArray count];
+    [arpArray addObject:entry];
+    return count;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeObjectAtIndex:
+// ---------------------------------------------------------------------------------
+- (BOOL)removeObjectAtIndex:(int)index
+{
+    int count;
+    BOOL result = NO;
+    count = [arpArray count];
+    if (index < count) {
+        [arpArray removeObjectAtIndex:index];
+        result = YES;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ replaceObjectAtIndex:
+// ---------------------------------------------------------------------------------
+// replace object for specified index
+// return NO if index is beyond end of array+1
+- (BOOL)replaceObjectAtIndex:(int)index withObject:(id)object {
+    int count;
+    BOOL result = NO;
+    count = [arpArray count];
+    if (index < count) {
+        [arpArray replaceObjectAtIndex:index withObject:object];
+        result = YES;
+    }
+    else if (index == count) {
+        [self addObject:object];
+        result = YES;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ objectAtIndex:
+// ---------------------------------------------------------------------------------
+// get object value from Table data array for specified index.
+// Return false if index is beyond end of array.
+- (id)objectAtIndex:(unsigned)index {
+    id result;
+    int count;
+    count = [arpArray count];
+    if (index < count) {
+        result = [arpArray objectAtIndex:index];
+    } else {
+        result = nil;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ count
+// ---------------------------------------------------------------------------------
+- (unsigned)count
+{
+    return [arpArray count];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ entryForIpAddress:
+// ---------------------------------------------------------------------------------
+// Find matching entry if any
+- (ArpEntry *)entryForIpAddress:(NSString *)ipAddress
+{
+	ArpEntry* returnValue = nil;
+	NSEnumerator* en;
+	ArpEntry* entry;
+	en = [arpArray objectEnumerator];
+	while (entry = [en nextObject]) {
+		if ([ipAddress isEqualTo:[entry ipAddress]]) {
+			returnValue = entry;
+			break;
+		}
+	}
+	return returnValue;
+}
+
+#pragma mark --- NSTableViewDelegate ---
+//- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldEditTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)selectionShouldChangeInTableView:(NSTableView *)aTableView;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectTableColumn:(NSTableColumn *)tableColumn;
+
+
+#pragma mark --- NSTableDataSource ---
+- (int)numberOfRowsInTableView:(NSTableView *)tableView
+{
+	return [arpArray count];
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	ArpEntry* entry;
+	entry = [arpArray objectAtIndex:row];
+	return [entry valueForKey:[tableColumn identifier]];
+}
+
+// optional
+- (void)tableView:(NSTableView *)tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	ArpEntry* entry;
+	NSString* columnID;
+	id oldValue;
+	
+	entry = [arpArray objectAtIndex:row];
+	columnID = [tableColumn identifier];
+	oldValue = [entry valueForKey:columnID];
+	[[oldValue retain] autorelease];
+	[entry setValue:object forKey:columnID];
+	// note if value has changed
+	if (oldValue) {
+		if ([(NSString *)object compare:oldValue] != NSOrderedSame)
+			[delegate updateParameter:@"ArpEntry" withObject:entry];
+	}
+	else if (object) {
+		[delegate updateParameter:@"ArpEntry" withObject:entry];
+	}
+}
+@end

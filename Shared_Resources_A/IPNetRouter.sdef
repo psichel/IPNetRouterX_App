@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="IPNetRouter Terminology">
+	<suite name="Standard Suite" code="core" description="Common classes and commands for all applications.">
+		<enumeration name="save options" code="savo">
+			<enumerator name="yes" code="yes " description="Save the file."/>
+			<enumerator name="no" code="no  " description="Do not save the file."/>
+			<enumerator name="ask" code="ask " description="Ask the user whether or not to save the file."/>
+		</enumeration>
+		<!-- 
+				<parameter name="as" code="fltp" type="text" optional="yes" description="The file format to use.">
+					<cocoa key="FileType"/>
+				</parameter>
+			-->
+		<enumeration name="printing error handling" code="enum">
+			<enumerator name="standard" code="lwst" description="Standard PostScript error handling"/>
+			<enumerator name="detailed" code="lwdt" description="print a detailed report of PostScript errors"/>
+		</enumeration>
+		<record-type name="print settings" code="pset">
+			<property name="copies" code="lwcp" description="the number of copies of a document to be printed" type="integer">
+				<cocoa key="NSCopies"/>
+			</property>
+			<property name="collating" code="lwcl" description="Should printed copies be collated?" type="boolean">
+				<cocoa key="NSMustCollate"/>
+			</property>
+			<property name="starting page" code="lwfp" description="the first page of the document to be printed" type="integer">
+				<cocoa key="NSFirstPage"/>
+			</property>
+			<property name="ending page" code="lwlp" description="the last page of the document to be printed" type="integer">
+				<cocoa key="NSLastPage"/>
+			</property>
+			<property name="pages across" code="lwla" description="number of logical pages laid across a physical page" type="integer">
+				<cocoa key="NSPagesAcross"/>
+			</property>
+			<property name="pages down" code="lwld" description="number of logical pages laid out down a physical page" type="integer">
+				<cocoa key="NSPagesDown"/>
+			</property>
+			<property name="requested print time" code="lwqt" description="the time at which the desktop printer should print the document" type="date">
+				<cocoa key="NSPrintTime"/>
+			</property>
+			<property name="error handling" code="lweh" description="how errors are handled" type="printing error handling">
+				<cocoa key="NSDetailedErrorReporting"/>
+			</property>
+			<property name="fax number" code="faxn" description="for fax number" type="text">
+				<cocoa key="NSFaxNumber"/>
+			</property>
+			<property name="target printer" code="trpr" description="for target printer" type="text">
+				<cocoa key="NSPrinterName"/>
+			</property>
+		</record-type>
+		<class name="application" code="capp" description="The application&apos;s top-level scripting object.">
+			<cocoa class="NSApplication"/>
+			<element type="document">
+				<cocoa key="orderedDocuments"/>
+			</element>
+			<element type="window" access="r">
+				<cocoa key="orderedWindows"/>
+			</element>
+			<property name="name" code="pnam" description="The name of the application." type="text" access="r"/>
+			<property name="frontmost" code="pisf" description="Is this the active application?" type="boolean" access="r">
+				<cocoa key="isActive"/>
+			</property>
+			<property name="version" code="vers" description="The version number of the application." type="text" access="r"/>
+			<property name="autosave" code="ausv" description="Does the application autosave documents?" type="boolean" access="rw"/>
+			<property name="autosave interval" code="ausi" description="The interval at which the application autosaves documents, in seconds." type="integer" access="rw"/>
+			<responds-to name="open">
+				<cocoa method="handleOpenScriptCommand:"/>
+			</responds-to>
+			<responds-to name="print">
+				<cocoa method="handlePrintScriptCommand:"/>
+			</responds-to>
+			<responds-to name="quit">
+				<cocoa method="handleQuitScriptCommand:"/>
+			</responds-to>
+		</class>
+		<class name="window" code="cwin" description="A window.">
+			<cocoa class="NSWindow"/>
+			<property name="name" code="pnam" description="The title of the window." type="text" access="r">
+				<cocoa key="title"/>
+			</property>
+			<property name="id" code="ID  " description="The unique identifier of the window." type="integer" access="r">
+				<cocoa key="uniqueID"/>
+			</property>
+			<property name="index" code="pidx" description="The index of the window, ordered front to back." type="integer">
+				<cocoa key="orderedIndex"/>
+			</property>
+			<property name="bounds" code="pbnd" description="The bounding rectangle of the window." type="rectangle">
+				<cocoa key="boundsAsQDRect"/>
+			</property>
+			<property name="closeable" code="hclb" description="Does the window have a close button?" type="boolean" access="r">
+				<cocoa key="hasCloseBox"/>
+			</property>
+			<property name="miniaturizable" code="ismn" description="Does the window have a minimize button?" type="boolean" access="r">
+				<cocoa key="isMiniaturizable"/>
+			</property>
+			<property name="miniaturized" code="pmnd" description="Is the window minimized right now?" type="boolean">
+				<cocoa key="isMiniaturized"/>
+			</property>
+			<property name="resizable" code="prsz" description="Can the window be resized?" type="boolean" access="r">
+				<cocoa key="isResizable"/>
+			</property>
+			<property name="visible" code="pvis" description="Is the window visible right now?" type="boolean">
+				<cocoa key="isVisible"/>
+			</property>
+			<property name="zoomable" code="iszm" description="Does the window have a zoom button?" type="boolean" access="r">
+				<cocoa key="isZoomable"/>
+			</property>
+			<property name="zoomed" code="pzum" description="Is the window zoomed right now?" type="boolean">
+				<cocoa key="isZoomed"/>
+			</property>
+			<property name="document" code="docu" description="The document whose contents are displayed in the window." type="document" access="r"/>
+			<responds-to name="close">
+				<cocoa method="handleCloseScriptCommand:"/>
+			</responds-to>
+			<responds-to name="print">
+				<cocoa method="handlePrintScriptCommand:"/>
+			</responds-to>
+			<responds-to name="save">
+				<cocoa method="handleSaveScriptCommand:"/>
+			</responds-to>
+		</class>
+		<command name="open" code="aevtodoc" description="Open a document."/>
+		<command name="close" code="coreclos" description="Close a document.">
+			<cocoa class="NSCloseCommand"/>
+			<direct-parameter description="the document(s) or window(s) to close." type="specifier"/>
+			<parameter name="saving" code="savo" description="Should changes be saved before closing?" type="save options" optional="yes">
+				<cocoa key="SaveOptions"/>
+			</parameter>
+			<parameter name="saving in" code="kfil" description="The file in which to save the document, if so." type="file" optional="yes">
+				<cocoa key="File"/>
+			</parameter>
+		</command>
+		<command name="save" code="coresave" description="Save a document.">
+			<direct-parameter description="The document(s) or window(s) to save." type="specifier"/>
+			<parameter name="in" code="kfil" description="The file in which to save the document." type="file" optional="yes">
+				<cocoa key="File"/>
+			</parameter>
+		</command>
+		<command name="print" code="aevtpdoc" description="Print a document.">
+			<parameter name="with properties" code="prdt" description="The print settings to use." type="print settings" optional="yes">
+				<cocoa key="PrintSettings"/>
+			</parameter>
+			<parameter name="print dialog" code="pdlg" description="Should the application show the print dialog?" type="boolean" optional="yes">
+				<cocoa key="ShowPrintDialog"/>
+			</parameter>
+		</command>
+		<command name="quit" code="aevtquit" description="Quit the application.">
+			<cocoa class="NSQuitCommand"/>
+			<parameter name="saving" code="savo" description="Should changes be saved before quitting?" type="save options" optional="yes">
+				<cocoa key="SaveOptions"/>
+			</parameter>
+		</command>
+		<command name="count" code="corecnte" description="Return the number of elements of a particular class within an object.">
+			<cocoa class="NSCountCommand"/>
+			<direct-parameter description="The objects to be counted." type="specifier"/>
+			<parameter hidden="yes" name="each" code="kocl" description="The class of objects to be counted." type="type" optional="yes">
+				<cocoa key="ObjectClass"/>
+			</parameter>
+			<result description="The count." type="integer"/>
+		</command>
+		<command name="delete" code="coredelo" description="Delete an object.">
+			<cocoa class="NSDeleteCommand"/>
+			<direct-parameter description="The object(s) to delete." type="specifier"/>
+		</command>
+		<command name="duplicate" code="coreclon" description="Copy an object.">
+			<cocoa class="NSCloneCommand"/>
+			<direct-parameter description="The object(s) to copy." type="specifier"/>
+			<parameter name="to" code="insh" description="The location for the new copy or copies." type="location specifier">
+				<cocoa key="ToLocation"/>
+			</parameter>
+			<parameter name="with properties" code="prdt" description="Properties to set in the new copy or copies right away." type="record" optional="yes">
+				<cocoa key="WithProperties"/>
+			</parameter>
+		</command>
+		<command name="exists" code="coredoex" description="Verify that an object exists.">
+			<cocoa class="NSExistsCommand"/>
+			<direct-parameter description="The object(s) to check." type="any"/>
+			<result description="Did the object(s) exist?" type="boolean"/>
+		</command>
+		<command name="make" code="corecrel" description="Create a new object.">
+			<cocoa class="NSCreateCommand"/>
+			<parameter name="new" code="kocl" description="The class of the new object." type="type">
+				<cocoa key="ObjectClass"/>
+			</parameter>
+			<parameter name="at" code="insh" description="The location at which to insert the object." type="location specifier" optional="yes">
+				<cocoa key="Location"/>
+			</parameter>
+			<parameter name="with data" code="data" description="The initial contents of the object." type="any" optional="yes">
+				<cocoa key="ObjectData"/>
+			</parameter>
+			<parameter name="with properties" code="prdt" description="The initial values for properties of the object." type="record" optional="yes">
+				<cocoa key="KeyDictionary"/>
+			</parameter>
+			<result description="The new object." type="specifier"/>
+		</command>
+		<command name="move" code="coremove" description="Move an object to a new location.">
+			<cocoa class="NSMoveCommand"/>
+			<direct-parameter description="The object(s) to move." type="specifier"/>
+			<parameter name="to" code="insh" description="The new location for the object(s)." type="location specifier">
+				<cocoa key="ToLocation"/>
+			</parameter>
+		</command>
+	</suite>
+	<suite name="Text Suite" code="TEXT" description="Common text classes for all applications.">
+		<value-type name="color" code="cRGB">
+			<cocoa class="NSColor"/>
+		</value-type>
+		<class name="rich text" code="ctxt" description="Rich (styled) text." plural="rich text">
+			<cocoa class="NSTextStorage"/>
+			<element type="character"/>
+			<element type="paragraph"/>
+			<element type="word"/>
+			<element type="attribute run"/>
+			<element type="attachment"/>
+			<property name="color" code="colr" description="The color of the text&apos;s first character." type="color">
+				<cocoa key="foregroundColor"/>
+			</property>
+			<property name="font" code="font" description="The name of the font of the text&apos;s first character." type="text">
+				<cocoa key="fontName"/>
+			</property>
+			<property name="size" code="ptsz" description="The size in points of the text&apos;s first character." type="integer">
+				<cocoa key="fontSize"/>
+			</property>
+			<type type="text"/>
+		</class>
+		<class name="character" code="cha " description="One of some text&apos;s characters.">
+			<cocoa class="NSTextStorage"/>
+			<element type="character"/>
+			<element type="paragraph"/>
+			<element type="word"/>
+			<element type="attribute run"/>
+			<element type="attachment"/>
+			<property name="color" code="colr" description="Its color." type="color">
+				<cocoa key="foregroundColor"/>
+			</property>
+			<property name="font" code="font" description="The name of its font." type="text">
+				<cocoa key="fontName"/>
+			</property>
+			<property name="size" code="ptsz" description="Its size, in points." type="integer">
+				<cocoa key="fontSize"/>
+			</property>
+			<type type="text"/>
+		</class>
+		<class name="paragraph" code="cpar" description="One of some text&apos;s paragraphs.">
+			<cocoa class="NSTextStorage"/>
+			<element type="character"/>
+			<element type="paragraph"/>
+			<element type="word"/>
+			<element type="attribute run"/>
+			<element type="attachment"/>
+			<property name="color" code="colr" description="The color of the paragraph&apos;s first character." type="color">
+				<cocoa key="foregroundColor"/>
+			</property>
+			<property name="font" code="font" description="The name of the font of the paragraph&apos;s first character." type="text">
+				<cocoa key="fontName"/>
+			</property>
+			<property name="size" code="ptsz" description="The size in points of the paragraph&apos;s first character." type="integer">
+				<cocoa key="fontSize"/>
+			</property>
+			<type type="text"/>
+		</class>
+		<class name="word" code="cwor" description="One of some text&apos;s words.">
+			<cocoa class="NSTextStorage"/>
+			<element type="character"/>
+			<element type="paragraph"/>
+			<element type="word"/>
+			<element type="attribute run"/>
+			<element type="attachment"/>
+			<property name="color" code="colr" description="The color of the word&apos;s first character." type="color">
+				<cocoa key="foregroundColor"/>
+			</property>
+			<property name="font" code="font" description="The name of the font of the word&apos;s first character." type="text">
+				<cocoa key="fontName"/>
+			</property>
+			<property name="size" code="ptsz" description="The size in points of the word&apos;s first character." type="integer">
+				<cocoa key="fontSize"/>
+			</property>
+			<type type="text"/>
+		</class>
+		<class name="attribute run" code="catr" description="A chunk of text that all has the same attributes.">
+			<cocoa class="NSTextStorage"/>
+			<element type="character"/>
+			<element type="paragraph"/>
+			<element type="word"/>
+			<element type="attribute run"/>
+			<element type="attachment"/>
+			<property name="color" code="colr" description="Its color." type="color">
+				<cocoa key="foregroundColor"/>
+			</property>
+			<property name="font" code="font" description="The name of its font." type="text">
+				<cocoa key="fontName"/>
+			</property>
+			<property name="size" code="ptsz" description="Its size, in points." type="integer">
+				<cocoa key="fontSize"/>
+			</property>
+			<type type="text"/>
+		</class>
+		<class name="attachment" code="atts" description="A file embedded in text. This is just for use when embedding a file using the make command." inherits="rich text">
+			<cocoa class="NSAttachmentTextStorage"/>
+			<property name="file name" code="atfn" description="The path to the embedded file." type="text">
+				<cocoa key="filename"/>
+			</property>
+		</class>
+	</suite>
+	<suite name="IPNetRouter Suite" code="IPnl" description="Commands and classes for IPNetRouter Scripting">
+		<enumeration name="exposed host selection" code="exps" description="Exposed host selection: gateway, host, none.">
+			<cocoa name="exposedHostSelection"/>
+			<enumerator name="gateway" code="Gate" description="Expose Gateway">
+				<cocoa name="exposedHostSelection"/>
+			</enumerator>
+			<enumerator name="host" code="Host" description="Expose Host"/>
+			<enumerator name="stealth" code="None" description="Expose none"/>
+		</enumeration>
+		<enumeration name="protocol" code="Prto" description="Protocol in IP header">
+			<cocoa name="protocol"/>
+			<enumerator name="any" code="pAny"/>
+			<enumerator name="icmp" code="Icmp"/>
+			<enumerator name="tcp" code="pTCP"/>
+			<enumerator name="udp" code="pUDP"/>
+			<enumerator name="gre" code="pGRE"/>
+		</enumeration>
+		<enumeration name="trigger type" code="TgrT" description="Trigger Type">
+			<enumerator name="block" code="Blok" description="Block IP address">
+				<cocoa name="triggerTypeBlock"/>
+			</enumerator>
+			<enumerator name="authorize" code="Auth" description="Authorize address">
+				<cocoa name="triggerTypeAuthorize"/>
+			</enumerator>
+			<enumerator name="address" code="Addr" description="address">
+				<cocoa name="triggerTypeAddress"/>
+			</enumerator>
+		</enumeration>
+		<class name="application" code="capp" description="IPNetRouter top-level scripting object">
+			<cocoa class="NSApplication"/>
+			<element description="Array of interface entries forming Interface Table" type="interface" access="w">
+				<cocoa key="interfaces"/>
+				<accessor style="id"/>
+			</element>
+			<element description="Array of Port Map Entries forming Port Map Table" type="port map">
+				<cocoa key="portMaps"/>
+				<accessor style="id"/>
+			</element>
+			<element description="Array of trigger entries forming trigger table" type="trigger">
+				<cocoa key="triggers"/>
+				<accessor style="id"/>
+			</element>
+			<property name="ip forwarding" code="Fwrd" description="enable ip forwarding" type="boolean">
+				<cocoa key="ipForwarding"/>
+			</property>
+			<property name="firewall on" code="Fwll" description="Firewall on/off master switch" type="boolean">
+				<cocoa key="firewallOn"/>
+			</property>
+		</class>
+		<class name="interface" code="ifcE" description="Interface table entry" plural="interfaces">
+			<cocoa class="interfaceEntry"/>
+			<element description="Primary or alternate gateway IP address" type="gateway">
+				<cocoa key="gateway"/>
+				<accessor style="index"/>
+			</element>
+			<property name="filters" code="Filt" description="Enable IP filters on this interface" type="boolean">
+				<cocoa key="filterOn"/>
+			</property>
+			<property name="external" code="Extl" description="Designate external interface" type="boolean">
+				<cocoa key="externalOn"/>
+			</property>
+			<property name="NAT" code="NAPT" description="Enable Network Address Translation on this interface" type="boolean">
+				<cocoa key="natOn"/>
+			</property>
+			<property name="bridge" code="Brdg" description="Enable Ethernet bridging to this interface" type="boolean">
+				<cocoa key="bridgeOn"/>
+			</property>
+			<property name="interface name" code="IfNm" description="Interface name" type="text">
+				<cocoa key="interfaceName"/>
+			</property>
+			<property name="interface ID" code="IfID" description="Interface Identifier" type="text">
+				<cocoa key="interfaceID"/>
+			</property>
+			<property name="IP address" code="IPAd" description="IP Address and prefix length for subnet" type="interface address">
+				<cocoa key="ipAddress"/>
+			</property>
+		</class>
+		<class name="port map" code="PMpE" description="Port map table entry" plural="port map entries">
+			<cocoa class="portMapEntry"/>
+			<property name="enabled" code="PmOn" description="Port map enabled" type="boolean">
+				<cocoa key="enabled"/>
+			</property>
+			<property name="dynamic" code="PDyn" description="Apparent address changes with this interface" type="text"/>
+			<property name="protocol" code="Prot" type="protocol"/>
+			<property name="apparent address" code="ApAd" description="Apparent Address" type="text">
+				<cocoa key="apparendAddress"/>
+			</property>
+			<property name="apparent port" code="ApPo" description="Apparent Port" type="integer">
+				<cocoa key="apparentPort"/>
+			</property>
+			<property name="actual address" code="AcAd" description="Actual Address" type="text">
+				<cocoa key="actualAddress"/>
+			</property>
+			<property name="actual port" code="AcPo" description="Actual Port" type="integer">
+				<cocoa key="actualPort"/>
+			</property>
+			<property name="comment" code="Cmnt" description="Comment" type="text">
+				<cocoa key="comment"/>
+			</property>
+		</class>
+		<class name="trigger" code="TrgE" description="Trigger table entry" plural="triggers">
+			<cocoa class="triggerEntry"/>
+			<property name="IP address" code="IPad" description="IP address" type="text">
+				<cocoa key="ipAddress"/>
+			</property>
+			<property name="type" code="Type" description="Trigger type" type="trigger type">
+				<cocoa key="triggerType"/>
+			</property>
+			<property name="triggered by" code="TgBy" description="firewall rule or explanation" type="text">
+				<cocoa key="triggeredBy"/>
+			</property>
+			<property name="match count" code="Mtch" description="Number of packets that have matched this trigger" type="integer">
+				<cocoa key="matchCount"/>
+			</property>
+			<property name="last time" code="LstT" description="Late time packet matched this address" type="date">
+				<cocoa key="lastTime"/>
+			</property>
+			<property name="duration" code="Drtn" description="Age out time in seconds for inactive entry" type="integer">
+				<cocoa key="duration"/>
+			</property>
+		</class>
+		<class name="gateway" code="Gtwy" description="Gateway Address" plural="gateways">
+			<cocoa class="NSString"/>
+			<type type="text"/>
+		</class>
+		<class name="interface address" code="IfAd" description="IP address and prefix length">
+			<cocoa class="NSString"/>
+			<type type="text"/>
+		</class>
+		<class name="ip address" code="IPAd" description="IPv4 address represented as a dotted quad">
+			<cocoa class="NSString"/>
+			<type type="text"/>
+		</class>
+	</suite>
+</dictionary>

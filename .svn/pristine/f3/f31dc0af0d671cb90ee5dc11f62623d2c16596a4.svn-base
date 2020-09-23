@@ -1,0 +1,35 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {
+                addGateway = id; 
+                applyButton = id; 
+                automaticFailover = id; 
+                loadBalance = id; 
+                myHelp = id; 
+                removeGateway = id; 
+                revertButton = id; 
+                saveButton = id; 
+                sourceAwareRouting = id; 
+            }; 
+            CLASS = AlternateRouteWC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                applyButton = NSButton; 
+                automaticFailover = NSButton; 
+                loadBalance = NSButton; 
+                sourceAwareRouting = NSButton; 
+                statusInfo = NSTextField; 
+                tableView = NSTableView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>0</key>
+	<string>all ports</string>
+	<key>7</key>
+	<string>Echo</string>
+	<key>9</key>
+	<string>Discard</string>
+	<key>20</key>
+	<string>FTP-data</string>
+	<key>21</key>
+	<string>FTP</string>
+	<key>22</key>
+	<string>ssh</string>
+	<key>23</key>
+	<string>Telnet</string>
+	<key>25</key>
+	<string>SMTP</string>
+	<key>43</key>
+	<string>whois</string>
+	<key>53</key>
+	<string>DNS</string>
+	<key>67</key>
+	<string>DHCP-server</string>
+	<key>68</key>
+	<string>DHCP-client</string>
+	<key>69</key>
+	<string>TFTP</string>
+	<key>70</key>
+	<string>Gopher</string>
+	<key>79</key>
+	<string>Finger</string>
+	<key>80</key>
+	<string>HTTP</string>
+	<key>88</key>
+	<string>Kerberos</string>
+	<key>105</key>
+	<string>PH</string>
+	<key>106</key>
+	<string>Poppass</string>
+	<key>107</key>
+	<string>rtelnet</string>
+	<key>110</key>
+	<string>pop3</string>
+	<key>111</key>
+	<string>RPC</string>
+	<key>113</key>
+	<string>AUTH</string>
+	<key>119</key>
+	<string>NNTP</string>
+	<key>123</key>
+	<string>NTP</string>
+	<key>139</key>
+	<string>NETBIOS Session</string>
+	<key>143</key>
+	<string>IMAP2</string>
+	<key>161</key>
+	<string>SNMP</string>
+	<key>162</key>
+	<string>snmptrap</string>
+	<key>177</key>
+	<string>xdmcp</string>
+	<key>178</key>
+	<string>nextstep</string>
+	<key>179</key>
+	<string>BGP</string>
+	<key>194</key>
+	<string>IRC</string>
+	<key>311</key>
+	<string>ASIP Web Admin</string>
+	<key>384</key>
+	<string>ARNS</string>
+	<key>387</key>
+	<string>AURP</string>
+	<key>389</key>
+	<string>ldap</string>
+	<key>407</key>
+	<string>Timbuktu</string>
+	<key>427</key>
+	<string>SLP</string>
+	<key>443</key>
+	<string>SSL (HTTPS)</string>
+	<key>497</key>
+	<string>Retrospect</string>
+	<key>510</key>
+	<string>FirstClass server</string>
+	<key>514</key>
+	<string>syslog</string>
+	<key>515</key>
+	<string>LPR</string>
+	<key>548</key>
+	<string>AFP (AppleShare)</string>
+	<key>554</key>
+	<string>RTSP</string>
+	<key>591</key>
+	<string>FileMaker Pro Web</string>
+	<key>626</key>
+	<string>IMAP Admin</string>
+	<key>660</key>
+	<string>ASIP Remote Admin</string>
+	<key>666</key>
+	<string>Now Contact Server</string>
+	<key>687</key>
+	<string>ASIP Shared Users+Groups</string>
+	<key>995</key>
+	<string>Secure POP3</string>
+	<key>1080</key>
+	<string>socks</string>
+	<key>1417</key>
+	<string>Timbuktu Control</string>
+	<key>1418</key>
+	<string>Timbuktu Observe</string>
+	<key>1419</key>
+	<string>Timbuktu Send Files</string>
+	<key>1420</key>
+	<string>Timbuktu Exchange</string>
+	<key>1433</key>
+	<string>MySQL</string>
+	<key>1443</key>
+	<string>WebSTAR/SSL Admin</string>
+	<key>3031</key>
+	<string>Program Linking</string>
+	<key>3283</key>
+	<string>ANAT</string>
+	<key>3389</key>
+	<string>RDP</string>
+	<key>4000</key>
+	<string>Now Public Event Server</string>
+	<key>4199</key>
+	<string>EIMS Admin</string>
+	<key>4347</key>
+	<string>LANserveyor Responders</string>
+	<key>5003</key>
+	<string>FileMaker Pro</string>
+	<key>5490</key>
+	<string>AOL Instant Messenger</string>
+	<key>5498</key>
+	<string>Hotline Tracker</string>
+	<key>5500</key>
+	<string>Hotline Server</string>
+	<key>5501</key>
+	<string>Hotline Server</string>
+	<key>6699</key>
+	<string>Napster/macster client</string>
+	<key>7070</key>
+	<string>Real Player</string>
+	<key>7648</key>
+	<string>CuSeeMe</string>
+	<key>7649</key>
+	<string>CuSeeMe</string>
+	<key>8080</key>
+	<string>HTTP alternate</string>
+	<key>19813</key>
+	<string>4D server</string>
+</dict>
+</plist>

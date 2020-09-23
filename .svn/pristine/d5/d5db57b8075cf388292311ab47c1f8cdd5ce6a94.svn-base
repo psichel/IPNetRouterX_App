@@ -1,0 +1,120 @@
+//
+//  TrafficDiscoveryModel.h
+//  IPNetSentryX
+//
+//  Created by psichel on Tue Feb 28 2006.
+//  Copyright (c) 2006 Sustainable Softworks. All rights reserved.
+//
+//	Encapsulate collecting traffic discovery info
+#import <Foundation/Foundation.h>
+#import PS_TNKE_INCLUDE
+#import "TDDayGroup.h"
+@class IPLookupController;
+
+
+#define kViewByService 0
+#define kViewByDevice  1
+#define kViewByNetflow 2
+#define kViewByPlotEntry 3
+
+#define kIntervalSecond	0
+#define kIntervalMinute	1
+#define kIntervalHour	2
+#define kIntervalDay	3
+#define kIntervalRecent	4
+
+// file name prefix
+#define kFileAttach @"TD attach"
+#define kFileDevice @"TD view by device"
+#define kFileService @"TD view by service"
+#define kFileNetflow @"TD view by netflow"
+
+#define kSampleDataVersion 1
+
+@interface TrafficDiscoveryModel : NSObject {	
+	NSMutableDictionary* openFilesDictionary;
+	NSMutableDictionary* sortedKeysDictionary;
+	NSMutableDictionary* savedFilesDictionary;	// fileName, last save time or access
+	NSTableView* sortTableView;
+	NSCalendarDate* sortDate;
+	
+	NSCalendarDate* firstTime;
+	NSCalendarDate* lastUpdateTime;
+	
+	NSTimer*		eventTimer;
+	NSCalendarDate*	lastSaveTime;
+	IPLookupController* lookupController;
+	int				localNameCount;
+}
++ (TrafficDiscoveryModel *)sharedInstance;
+// accessor
+- (NSTableView*)sortTableView;
+- (void)setSortTableView:(NSTableView*)value;
+- (NSCalendarDate*)sortDate;
+- (void)setSortDate:(NSCalendarDate*)value;
+
+- (NSCalendarDate*)firstTime;
+- (void)setFirstTime:(NSCalendarDate*)value;
+- (NSCalendarDate*)lastUpdateTime;
+- (void)setLastUpdateTime:(NSCalendarDate*)value;
+- (NSCalendarDate*)lastSaveTime;
+- (void)setLastSaveTime:(NSCalendarDate*)value;
+
+// receive data
+- (void)receiveTrafficUpdate:(NSData *)messageData;
+
+// periodical
+- (void)enableTD:(BOOL)value;
+- (void)timerStart;
+- (void)timerStop;
+- (void)eventTimer:(id)timer;
+- (void)addObserver:(id)target withSelector:(SEL)method;
+- (void)removeObserver:(id)target;
+// Notify listeners when state changes
+- (BOOL)updateParameter:(NSString *)name withObject:(id)anObject;
+
+// file I/O
+- (void)trafficDiscoveryReadForDate:(NSCalendarDate *)inDate;
+- (void)trafficDiscoverySaveForDate:(NSCalendarDate *)inDate;
+- (BOOL)writeToFile:(NSData *)inData withName:(NSString *)fileName;
+- (NSData *)readFromFile:(NSString *)fileName;
+- (NSMutableDictionary *)tdInfoDictionaryFromObject:(NSMutableDictionary *)inValue;
+- (NSMutableDictionary *)tdInfoObjectFromDictionary:(NSMutableDictionary *)inValue;
+- (void)rememberAccessToFile:(NSString *)name;
+- (void)rememberUpdateToFile:(NSString *)name;
+
+// NSTableDataSource
+- (int)numberOfRowsInTableView:(NSTableView *)tableView;
+- (id)tableView:(NSTableView *)tableView
+        objectValueForTableColumn:(NSTableColumn *)tableColumn
+        row:(int)row;
+// DS support
+- (TDDayGroup *)dayGroupForDate:(NSCalendarDate*)trafficDiscoveryTime tableView:(NSTableView*)tableView row:(int)row;
+- (TDEntry *)tdEntryForAttach:(NSString*)attachID
+	date:(NSCalendarDate*)trafficDiscoveryTime
+	interval:(int)interval;
+- (void)lookupCompleted:(NSNotification *)aNotification;
+- (void)updateIndex:(NSString*)fileName;
+@end
+
+extern NSString *TDNotification;
+extern NSString *TDNewGroup;
+
+int tdSecondsForInterval(int interval);
+NSString* filePrefixForViewBy(int viewBy);
+NSString* fileNameWithDate(NSString* prefix, NSCalendarDate* inDate);
+
+/*
+Traffic Discovery Design Description
+
+When "Traffic Discovery" is enabled, a corresponding flag is set in the NKE which causes it to send a trafficDiscovery report every second containing a trafficEntry for each active connection.  An active connection entry is a connection that records traffic during the last one second interval.
+
+These traffic discovery reports are received by the NKE controller which forwards them to the shared instance of the TrafficDiscoveryModel.  The TD Model receiveTrafficUpdate walks the list of traffic entries in the report sending each entry to deviceUpdate and serviceUpdate methods.  It also compares the trafficDiscoveryTime in this report to the first time in the current data set and calls out to save the current data set if the dayOfYear has changed.
+
+The deviceUpdate method accumulates trafficDiscovery data in a hierarchy of objects named TDDayGroup, TDHourGroup, and TDMinuteGroup.  Each of these objects provides a method to obtain the next object in the hierarchy by index, hourGroupForIndex: and minuteGroupForIndex allocating a new empty object if needed.  TDDayGroups are stored in a TDDeviceDictionary by their device identifier.  The TDDeviceDictionary contains a key for each identified device and a TDDayGroup with the corresponding traffic data.
+
+Any time traffic discovery is enabled, a periodic one second event timer is started.  When a traffic update is received, the fire time is set to 1.1 seconds from now so actual reports will always take priority over timer events.  If no traffic update is received, a timer event is processed to advance the traffic discovery time by one second causing any averages to update accordingly.
+
+Within the Traffic Discovery Window, a play/pause control sets the "Now playing" flag.  If traffic updates are playing, any update or timer event advances the traffic data displayed.  A showNowPopup selects whether to display any currently received traffic updates, or previously recorded data selected in the dateField.  Selecting "Show Now" sets play mode.  Selecting "Show Recorded" sets pause mode.
+*/
+

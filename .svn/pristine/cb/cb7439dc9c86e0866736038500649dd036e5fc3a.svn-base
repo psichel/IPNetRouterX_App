@@ -1,0 +1,23 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {cancel = id; export = id; import = id; myHelp = id; }; 
+            CLASS = TriggerImportWC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                statusInfo = NSTextField; 
+                triggerDurationPopUp = NSPopUpButton; 
+                triggerTypePopUp = NSPopUpButton; 
+                triggeredByField = NSTextField; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

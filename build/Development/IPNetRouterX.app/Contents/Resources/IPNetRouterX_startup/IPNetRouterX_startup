@@ -1,0 +1,3 @@
+﻿#!/bin/sh
+## Launch IPNetRouterX startup item as a background daemon
+<filepath> -startup

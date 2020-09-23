@@ -1,0 +1,1022 @@
+//
+//  NameServiceModel.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on 1/6/06.
+//  Copyright 2006 Sustainable Softworks. All rights reserved.
+//
+
+#import "NameServiceModel.h"
+#import "SentryModel.h"
+#import "Authorization.h"
+#import "AppDelegate.h"
+#import "InterfaceTable.h"
+#import "InterfaceEntry.h"
+#import "SystemConfiguration.h"
+#import "IPSupport.h"
+#import "SentryLogger.h"
+#import "DHCPController.h"
+#import "DHCPEntry.h"
+#include <sys/syslog.h>
+
+// Globals
+NSString *NameServiceNotification = @"NameServiceNotification";
+
+@interface NameServiceModel (PrivateMethods)
+- (NSMutableDictionary *)zoneNames;
+- (void)setZoneNames:(NSMutableDictionary *)value;
+@end
+
+@implementation NameServiceModel
+
+// ---------------------------------------------------------------------------------
+//	• sharedInstance
+// ---------------------------------------------------------------------------------
++ (NameServiceModel *) sharedInstance {
+	static id sharedTask = nil;
+	
+	if(sharedTask==nil) {
+		sharedTask = [[NameServiceModel alloc] init];
+	}
+	return sharedTask;
+}
+
+// ---------------------------------------------------------------------------------
+//	• init and dealloc
+// ---------------------------------------------------------------------------------
+- (id) init {
+    if (self = [super init]) {
+		// instance vars
+		templateDefault = nil;
+		templateActive = nil;
+		templateEdit = nil;
+		runNamedPath = nil;
+		nameServerTask = nil;
+		// request interface table notifications
+		[[InterfaceTable sharedInstance] addObserver:self withSelector:@selector(receiveNotification:)];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [[InterfaceTable sharedInstance] removeObserver:self];
+	[self setTemplateDefault:nil];
+	[self setTemplateActive:nil];
+	[self setTemplateEdit:nil];
+	[runNamedPath release]; runNamedPath = nil;
+	[nameServerTask release]; nameServerTask = nil;
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	• receiveNotification:
+// ---------------------------------------------------------------------------------
+// accept notifications from those we're observing (InterfaceTable)
+- (void)receiveNotification:(NSNotification *)aNotification
+{
+    NSDictionary* dictionary = [aNotification userInfo];
+	if ([dictionary objectForKey:SA_interfaceTable]) {
+		if ([[self nameServiceOn] intValue]) [self nameServiceApply];
+	}
+}
+
+#pragma mark -- get/set working --
+// ---------------------------------------------------------------------------------
+//	• namedIsRunning
+// ---------------------------------------------------------------------------------
+// return pid if running
+- (int)namedIsRunning {
+	int pid = [Authorization getPID:@"named"];
+	return pid;
+}
+
+// ---------------------------------------------------------------------------------
+//	• runNamedPath
+// ---------------------------------------------------------------------------------
+- (NSString *)runNamedPath
+{
+	// get runNamedPath if needed
+	if (!runNamedPath) {
+		// setup to run tool
+		runNamedPath = [AppSupport toolPathForName:@"RunNamed" fileExists:nil];
+		[runNamedPath retain];
+	}
+	return runNamedPath;
+}
+
+// ---------------------------------------------------------------------------------
+//	• serverState
+// ---------------------------------------------------------------------------------
+// update any listeners to show server state
+- (void)serverState
+{
+	// show named status
+	int pid = [self namedIsRunning];
+	if (pid) {
+		[self updateParameter:@"nameServerState" withObject:@"Name Server on"];
+		[self updateParameter:@"startButton" withObject:@"Stop"];
+		[self updateParameter:@"stateDescription"
+			withObject:@"Click stop to prevent this computer from acting as a Name Server."];
+		[self updateParameter:@"statusInfo"
+			withObject:[NSString stringWithFormat:@"named is running. (Process ID %d)",pid]];
+	}
+	else {
+		[self updateParameter:@"nameServerState" withObject:@"Name Server off"];
+		[self updateParameter:@"startButton" withObject:@"Start"];
+		[self updateParameter:@"stateDescription"
+			withObject:@"Click start to allow this computer to be used as a Name Server."];
+		[self updateParameter:@"statusInfo"
+			withObject:@"named is not running."];
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	• templateDefault
+// ---------------------------------------------------------------------------------
+- (NSDictionary *)templateDefault { return templateDefault; }
+- (void)setTemplateDefault:(NSDictionary *)value
+{
+	NSDictionary* myCopy = [[NSDictionary dictionaryWithDictionary:value] retain];
+	[templateDefault release];
+	templateDefault = myCopy;
+}
+
+// ---------------------------------------------------------------------------------
+//	• templateActive
+// ---------------------------------------------------------------------------------
+- (NSDictionary *)templateActive { return templateActive; }
+- (void)setTemplateActive:(NSDictionary *)value
+{
+	NSDictionary* myCopy = [[NSDictionary dictionaryWithDictionary:value] retain];
+	[templateActive release];
+	templateActive = myCopy;
+}
+
+// ---------------------------------------------------------------------------------
+//	• templateEdit
+// ---------------------------------------------------------------------------------
+- (NSMutableDictionary *)templateEdit { return templateEdit; }
+- (void)setTemplateEdit:(NSDictionary *)value
+{
+	NSMutableDictionary* myCopy = [[NSMutableDictionary dictionaryWithDictionary:value] retain];
+	[templateEdit release];
+	templateEdit = myCopy;
+}
+
+#pragma mark -- get/set saved state --
+// ---------------------------------------------------------------------------------
+//	• nameServiceOn
+// ---------------------------------------------------------------------------------
+// nameServiceOn
+- (NSNumber *)nameServiceOn {
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	NSNumber* num = [nameServiceD objectForKey:SS_nameServiceOn];
+	if (!num) num = [NSNumber numberWithInt:0];
+	return num;
+}
+- (void)setNameServiceOn:(NSNumber *)value
+{
+	int result;
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	// get runNamedPath if needed
+	[self runNamedPath];
+	if (value) {
+		[nameServiceD setObject:value forKey:SS_nameServiceOn];
+		if ([value intValue]) {	// on
+			if (![self namedIsRunning]) do {
+				// make sure named is properly configured and try to run it.
+#if 1
+					// check for rndc.key
+				NSFileManager* fm = [NSFileManager defaultManager];
+				NSString* filePath = @"/etc/rndc.key";
+				if (![fm fileExistsAtPath:filePath]) {
+					int i = 0;
+					// invoke helper to perform service
+					NSArray* args = [NSArray arrayWithObjects:@"-rndc.key", nil];
+					result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+					// wait for result
+					for (i=0; i<10; i++) {
+						if ([fm fileExistsAtPath:filePath]) break;
+						[NSThread  sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.2]];
+					}
+					if (i>=10) {
+						[self updateParameter:@"statusInfo" withObject:@"setNameServiceOn failed rndc.key"];
+					}
+				}
+#endif
+					// apply our current configuration (templateActive)
+					// by writing to /tmp/named_ipnr and then cp to /var/named_ipnr
+				[self nameServiceApply];
+				
+				// invoke helper to start service
+				NSArray* args = [NSArray arrayWithObjects:@"-start", nil];
+				result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+				if (result >= 0) [[SentryLogger sharedInstance] logMessage:@"\nName Server started."];
+			} while (false);
+		}
+		else {	// off
+			if ([self namedIsRunning]) {
+				// invoke helper to stop service
+				NSArray* args = [NSArray arrayWithObjects:@"-stop", nil];
+				result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+				if (result >= 0) [[SentryLogger sharedInstance] logMessage:@"\nName Server stopped."];
+			}
+		}
+	}
+	else {
+		[nameServiceD removeObjectForKey:SS_nameServiceOn];
+		if ([self namedIsRunning]) {
+			// invoke helper to stop service
+			NSArray* args = [NSArray arrayWithObjects:@"-stop", nil];
+			result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+			if (result >= 0) [[SentryLogger sharedInstance] logMessage:@"\nName Server stopped."];
+		}
+	}
+	// pause briefly to allow named to stablize
+	[NSThread  sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:1]];
+	// update serverState to show what actually happened
+	[self serverState];
+}
+
+// ---------------------------------------------------------------------------------
+//	• localCachingOn
+// ---------------------------------------------------------------------------------
+//	Mutable dictionary: key is  network string, value is NSNumber
+- (NSMutableDictionary *)localCachingOn {
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	id object = [nameServiceD objectForKey:SS_localCachingOn];
+	if (!object || ![object isKindOfClass:[NSDictionary class]]) object = [NSMutableDictionary dictionary];
+	return object;
+}
+- (void)setLocalCachingOn:(NSMutableDictionary *)value
+{
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	if (value) {
+		[nameServiceD setObject:value forKey:SS_localCachingOn];
+	}
+	else [nameServiceD removeObjectForKey:SS_localCachingOn];
+	// update UI as needed
+	[self updateParameter:@"updateZones" withObject:@"updateZones"];
+}
+
+// ---------------------------------------------------------------------------------
+//	• nameServerForNetwork
+// ---------------------------------------------------------------------------------
+// respond whether local caching name server is turned on and server is running for
+// this network
+- (BOOL)nameServerForNetwork:(NSString *)network
+{
+	BOOL returnValue = NO;
+	do {
+		if (!network) break;
+		NSDictionary* on = [self localCachingOn];
+		// enabled on this network interface?
+		if ([[on objectForKey:network] intValue]) {
+			// is named running
+			returnValue = [self namedIsRunning];
+		}
+	} while (false);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	• zoneNames
+// ---------------------------------------------------------------------------------
+//	Mutable dictionary: key is  network string, value is NSNumber
+- (NSMutableDictionary *)zoneNames {
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	id object = [nameServiceD objectForKey:SS_zoneNames];
+	if (!object || ![object isKindOfClass:[NSDictionary class]]) object = [NSMutableDictionary dictionary];
+	return object;
+}
+- (void)setZoneNames:(NSMutableDictionary *)value
+{
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	if (value) {
+		[nameServiceD setObject:value forKey:SS_zoneNames];
+	}
+	else [nameServiceD removeObjectForKey:SS_zoneNames];
+}
+
+// ---------------------------------------------------------------------------------
+//	• zoneNameForNetwork:
+// ---------------------------------------------------------------------------------
+- (NSString *)zoneNameForNetwork:(NSString *)network
+{
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	NSMutableDictionary* zoneNames = [nameServiceD objectForKey:SS_zoneNames];
+	if (!zoneNames || ![zoneNames isKindOfClass:[NSDictionary class]]) {
+		zoneNames = [NSMutableDictionary dictionary];
+		[nameServiceD setObject:zoneNames forKey:SS_zoneNames];
+	}
+	return [zoneNames objectForKey:network];
+}
+// ---------------------------------------------------------------------------------
+//	• setZoneName:forNetwork:
+// ---------------------------------------------------------------------------------
+- (void)setZoneName:(NSString *)zoneName forNetwork:(NSString *)network
+{
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	NSMutableDictionary* zoneNames = [nameServiceD objectForKey:SS_zoneNames];
+	NSString* oldName;
+	NSString* title;
+	NSString* text;
+	if (!zoneNames || ![zoneNames isKindOfClass:[NSDictionary class]]) {
+		zoneNames = [NSMutableDictionary dictionary];
+		[nameServiceD setObject:zoneNames forKey:SS_zoneNames];
+	}
+	// remember old name
+	oldName = [zoneNames objectForKey:network];
+	// set new name
+	if ([zoneName length]) [zoneNames setObject:zoneName forKey:network];
+	else [zoneNames removeObjectForKey:network];
+	// rename templates
+	if (oldName) {
+		// zone
+		title = [NSString stringWithFormat:@"%@.zone",oldName];
+		text = [templateEdit objectForKey:title];
+		if (text) {
+			[text retain];
+			[templateEdit removeObjectForKey:title];
+			title = [NSString stringWithFormat:@"%@.zone",zoneName];
+			[templateEdit setObject:text forKey:title];
+			[text release];
+		}
+		// rev
+		title = [NSString stringWithFormat:@"%@.rev",oldName];
+		text = [templateEdit objectForKey:title];
+		if (text) {
+			[text retain];
+			[templateEdit removeObjectForKey:title];
+			title = [NSString stringWithFormat:@"%@.rev",zoneName];
+			[templateEdit setObject:text forKey:title];
+			[text release];
+		}
+	}
+	// update UI as needed
+	[self updateParameter:@"updateZones" withObject:@"updateZones"];
+}
+
+
+// ---------------------------------------------------------------------------------
+//	• localHostNames
+// ---------------------------------------------------------------------------------
+//	Mutable dictionary: key is  network string, value is NSString (name)
+- (NSMutableDictionary *)localHostNames {
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	id object = [nameServiceD objectForKey:SS_localHostNames];
+	if (!object || ![object isKindOfClass:[NSDictionary class]]) {
+		object = [NSMutableDictionary dictionary];
+		[nameServiceD setObject:object forKey:SS_localHostNames];
+	}
+	return object;
+}
+- (void)setLocalHostNames:(NSMutableDictionary *)value
+{
+	NSMutableDictionary* nameServiceD = [[[SentryModel sharedInstance] sentryState] nameServiceDictionary];
+	if (value) {
+		[nameServiceD setObject:value forKey:SS_localHostNames];
+	}
+	else [nameServiceD removeObjectForKey:SS_localHostNames];
+}
+
+
+#pragma mark -- update templates --
+// ---------------------------------------------------------------------------------
+//	• doTemplate_named_conf
+// ---------------------------------------------------------------------------------
+// We tag the lines to be replaced with #IPNR_xxx;
+- (void)doTemplate_named_conf
+{
+	NSArray* oldList;
+	NSMutableArray* newList;
+	NSEnumerator* en;
+	NSString* line;
+	NSString* str;
+	NSString *text, *rtext;
+	NSRange range;
+	BOOL skipFlag = NO;
+	
+	// named.conf
+	text = [templateEdit objectForKey:kDNS_named_conf];
+	oldList = [text componentsSeparatedByString:@"\n"];
+	// walk each line and replace if needed
+	newList = [NSMutableArray arrayWithCapacity:[oldList count]+10];
+	en = [oldList objectEnumerator];
+	while (line = [en nextObject]) {
+		// look for #IPNR tag and extract key
+		range = [line rangeOfString:@"#IPNR"];
+		if (range.length == 0) {
+			if (!skipFlag) [newList addObject:line];	// just copy line as is
+			continue;
+		}
+		line = [line substringFromIndex:range.location+range.length];
+		range = [line rangeOfString:@";"];
+		if (range.length == 0) {
+			// inform user what happenned
+			syslog(LOG_WARNING, "unterminated DNS template record\n");
+			// copy line and confinue so user can correct the problem
+			[newList addObject:line];
+			continue;
+		}
+		line = [line substringToIndex:range.location];
+		if ([line isEqualTo:@"_internals"]) {
+			str = [[self enabledInternals] componentsJoinedByString:@"; "];
+			if ([str length]) {
+				line = [NSString stringWithFormat:
+					@"acl \"internals\" { %@; };	#IPNR_internals;",str];
+			}
+			else {
+				line = @"#IPNR_internals;";
+			}
+			[newList addObject:line];
+		}
+		else if ([line isEqualTo:@"_externals"]) {
+			str = [[self externals] componentsJoinedByString:@"; "];
+			if ([str length]) {
+				line = [NSString stringWithFormat:
+					@"acl \"externals\" { %@; };	#IPNR_externals;",str];
+			}
+			else {
+				line = @"#IPNR_externals;";
+			}
+			[newList addObject:line];
+		}
+		else if ([line isEqualTo:@"_zone_start"]) {
+			[newList addObject:@"#IPNR_zone_start;"];
+			NSArray* list = [self enabledInternals];
+			int i, limit;
+			limit = [list count];
+			// for each enabled network
+			for (i = 0; i<limit; i++) {
+					// get zoneName and revName
+				u_int32_t address, mask, reverse;
+				int prefixLen;
+				int j, removeSegments;
+				NSString* selectedNetwork = [list objectAtIndex:i];
+				netNumberForString(selectedNetwork, &address, &mask);
+				prefixLen = FindRightBit(mask, 32);
+				//address &= mask;
+				// swap bytes for PTR order A.B.C.D -> D.C.B.A
+				reverse = swap32(address);
+				str = stringForIP(reverse);
+				// remove segments from left
+				removeSegments = 4-prefixLen/8;
+				for (j=0; j<removeSegments; j++) {
+					range = [str rangeOfString:@"."];	// remove as needed
+					str = [str substringFromIndex:range.location+range.length];
+				}
+				NSString* revName = str;
+				NSString* zoneName = [self zoneNameForNetwork:selectedNetwork];
+					// forward zone defs
+				line = [NSString stringWithFormat:@"// Define forward mappings for zone %@",zoneName];
+					[newList addObject:line];
+				line = [NSString stringWithFormat:@"zone \"%@\" IN {",zoneName];	[newList addObject:line];
+				[newList addObject:@"\ttype master;"];
+				line = [NSString stringWithFormat:@"\tfile \"%@.zone\";",zoneName];	[newList addObject:line];
+				[newList addObject:@"\tallow-update { none; };"];
+				[newList addObject:@"};"];
+					// reverse zone defs
+				line = [NSString stringWithFormat:@"// Define reverse mappings for zone %@",zoneName];
+					[newList addObject:line];
+				line = [NSString stringWithFormat:@"zone \"%@.in-addr.arpa\" IN {",revName];	[newList addObject:line];
+				[newList addObject:@"\ttype master;"];
+				line = [NSString stringWithFormat:@"\tfile \"%@.rev\";",zoneName];	[newList addObject:line];
+				[newList addObject:@"\tallow-update { none; };"];
+				[newList addObject:@"};"];
+			}
+			skipFlag = YES;
+		}
+		else if ([line isEqualTo:@"_zone_end"]) {
+			[newList addObject:@"#IPNR_zone_end;"];
+			skipFlag = NO;
+		}
+		else if (!skipFlag) [newList addObject:line];	// just copy line as is
+	}
+	rtext = [newList componentsJoinedByString:@"\n"];
+	[templateEdit setObject:rtext forKey:kDNS_named_conf];
+	[self updateParameter:@"statusInfo" withObject:@"Template named.conf filled."];
+	[[SentryLogger sharedInstance] logMessage:@"Template named.conf filled."];
+}
+
+// ---------------------------------------------------------------------------------
+//	• doTemplate_named_cache
+// ---------------------------------------------------------------------------------
+// try to update named.cache
+- (void)doTemplate_named_cache
+{
+	[self updateParameter:@"statusInfo" withObject:@"Trying to load ftp://ftp.rs.internic.net/domain/named.cache"];
+	
+	NSString* text = [NSString stringWithContentsOfURL:
+		[NSURL URLWithString:@"ftp://ftp.rs.internic.net/domain/named.cache"]];
+	if ([text length]) {
+		NSString* p1 = @";-----------------------------------------------------------------------------";
+		NSString* p2 = @"; named.cache - A list of root servers which may be updated from the Internet.";
+		[templateEdit setObject:[NSString stringWithFormat:@"%@\n%@\n%@\n%@",p1,p2,p1,text] forKey:kDNS_named_cache];
+		[self updateParameter:@"statusInfo" withObject:@"Template named.cache filled."];
+		[[SentryLogger sharedInstance] logMessage:@"Template named.cache filled."];
+	}
+	else [self updateParameter:@"statusInfo" withObject:@"Please try again later"];
+}
+
+// ---------------------------------------------------------------------------------
+//	• doTemplate_zone
+// ---------------------------------------------------------------------------------
+// We tag the lines to be replaced with ;IPNR_xxx;
+- (void)doTemplate_zone:(NSString *)zone
+{
+	NSArray* oldList;
+	NSMutableArray* newList;
+	NSEnumerator* en;
+	NSString* line;
+	NSString* prefix;
+	NSString* str;
+	NSString* selectedNetwork = nil;
+	NSString *text, *rtext;
+	NSRange range;
+	NSString* pad = @"                            ";
+	NSString* pad1;
+	NSString* pad2;
+	char seen_A = 0;
+	char seen_PTR = 0;
+	char seen_origin = 0;
+	
+	// lan.zone
+	text = [templateEdit objectForKey:zone];
+	oldList = [text componentsSeparatedByString:@"\n"];
+	// walk each line and replace if needed
+	newList = [NSMutableArray arrayWithCapacity:[oldList count]+10];
+	en = [oldList objectEnumerator];
+	while (line = [en nextObject]) {
+		// look for ;IPNR tag and extract key
+		range = [line rangeOfString:@";IPNR"];
+		if (range.length == 0) {
+			[newList addObject:line];	// just copy line as is
+			continue;
+		}
+		prefix = [line substringToIndex:range.location];
+		line = [line substringFromIndex:range.location+range.length];
+		range = [line rangeOfString:@";"];
+		if (range.length == 0) continue;	// unterminated tag, discard
+		line = [line substringToIndex:range.location];
+		
+		// perform substitution based on tag
+		if ([line isEqualTo:@"_origin"]) {
+			if (seen_origin) continue;
+			seen_origin = 1;
+			// generate $ORIGIN directive for this zone
+			if ([zone hasSuffix:@".zone"]) {
+				str = [zone substringToIndex:[zone length]-4];
+				line = [NSString stringWithFormat:
+					@"$ORIGIN %@\t\t\t;IPNR_origin;",str];
+				[newList addObject:line];
+			}
+			else if ([zone hasSuffix:@".rev"]) {
+				u_int32_t address, mask, reverse;
+				int prefixLen;
+				int j, removeSegments;
+				NSArray* list = [self enabledInternals];
+				selectedNetwork = [list objectAtIndex:0];
+				netNumberForString(selectedNetwork, &address, &mask);
+				prefixLen = FindRightBit(mask, 32);
+				address &= mask;
+				// swap bytes for PTR order A.B.C.D -> D.C.B.A
+				reverse = swap32(address);
+				str = stringForIP(reverse);
+				// remove segments from left
+				removeSegments = 4-prefixLen/8;
+				for (j=0; j<removeSegments; j++) {
+					range = [str rangeOfString:@"."];	// remove as needed
+					str = [str substringFromIndex:range.location+range.length];
+				}
+				line = [NSString stringWithFormat:
+					@"$ORIGIN %@.in-addr.arpa.\t\t\t;IPNR_origin;",str];
+				[newList addObject:line];
+			}
+		}
+		else if ([line isEqualTo:@"_SOA"]) {
+			range = [zone rangeOfString:@"."];
+			NSString* zoneName = [zone substringToIndex:range.location];
+			line = [NSString stringWithFormat:
+				@"@  IN SOA  gateway.%@. root.%@.  (\t\t\t\t;IPNR_SOA;",zoneName,zoneName];
+			[newList addObject:line];
+		}
+		else if ([line isEqualTo:@"_serial"]) {
+			NSCalendarDate* cd = [NSCalendarDate calendarDate];
+			int yyyy = [cd yearOfCommonEra];
+			int mm = [cd monthOfYear];
+			int dd = [cd dayOfMonth];
+			int xx = 0;
+			// prefix contains old serial number
+			prefix = [prefix stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+			u_int32_t oldsn = [prefix intValue];
+			u_int32_t newsn = dd*100 + mm*10000 + yyyy*1000000;
+			// if oldsn is from today, increment revision number
+			if (oldsn >= newsn) xx = oldsn%100 + 1;
+			// build SN text
+			line = [NSString stringWithFormat:
+				@"                   %04d%02d%02d%02d    ;IPNR_serial; YYYYMMDDxx",yyyy,mm,dd,xx];
+			[newList addObject:line];
+		}
+		else if ([line isEqualTo:@"_NS"]) {
+			range = [zone rangeOfString:@"."];
+			NSString* zoneName = [zone substringToIndex:range.location];
+			if ([zone hasSuffix:@".rev"]) {
+				pad1 = [pad substringToIndex:17];
+				pad2 = [pad substringToIndex:16-[zoneName length]];
+			} else {
+				pad1 = [pad substringToIndex:25];
+				pad2 = [pad substringToIndex:8-[zoneName length]];
+			}
+			line = [NSString stringWithFormat:
+				@"%@ IN NS   gateway.%@. %@;IPNR_NS;",pad1,zoneName,pad2];
+			[newList addObject:line];
+		}
+		else if ([line isEqualTo:@"_A"]) {
+			if (seen_A) continue;
+			seen_A = 1;
+			{	// insert DNS A records
+				NSArray* list = [self enabledInternals];
+				NSString* zoneName = zone;
+				int i, limit;
+				limit = [list count];
+				for (i = 0; i<limit; i++) {
+					selectedNetwork = [list objectAtIndex:i];
+					zoneName = [self zoneNameForNetwork:selectedNetwork];
+					if ([zone hasPrefix:zoneName]) break;
+					selectedNetwork = nil;
+				}
+				if (selectedNetwork) {
+					// A records
+					// gateway.zone
+					u_int32_t address = ipForString(selectedNetwork);
+					str = stringForIP(address);
+						pad1 = [pad substringToIndex:16-[zoneName length]];
+						pad2 = [pad substringToIndex:17-[str length]];
+					line = [NSString stringWithFormat:
+						@"gateway.%@. %@IN A    %@ %@;IPNR_A; The name server box",zoneName,pad1,str,pad2];
+					[newList addObject:line]; 
+					// get other names and addresses from selectedSet table
+					NSMutableDictionary* mySet = [[self localHostNames] objectForKey:selectedNetwork];
+					if (mySet) {
+						NSEnumerator* en = [mySet keyEnumerator];
+						NSString* name;
+						NSString* ipAddress;
+						while (name = [en nextObject]) {
+							ipAddress = [mySet objectForKey:name];
+								pad1 = [pad substringToIndex:23-([name length]+[zoneName length])];
+								pad2 = [pad substringToIndex:17-[ipAddress length]];
+							line = [NSString stringWithFormat:
+								@"%@.%@. %@IN A    %@ %@;IPNR_A; A host on your LAN",name,zoneName,pad1,ipAddress,pad2];
+							[newList addObject:line];
+						}
+					}
+				}
+			}	// insert DNS A records
+			[newList addObject:@";IPNR_A; A record place-holder (define names for hosts on your LAN)"];
+		}
+		else if ([line isEqualTo:@"_PTR"]) {
+			if (seen_PTR) continue;
+			seen_PTR = 1;
+			{	// insert DNS PTR records
+				NSArray* list = [self enabledInternals];
+				NSString* zoneName = zone;
+				int i, limit;
+				limit = [list count];
+				for (i = 0; i<limit; i++) {
+					selectedNetwork = [list objectAtIndex:i];
+					zoneName = [self zoneNameForNetwork:selectedNetwork];
+					if ([zone hasPrefix:zoneName]) break;
+					selectedNetwork = nil;
+				}
+				if (selectedNetwork) {
+					u_int32_t address, mask, reverse;
+					int prefixLen;
+					int j, removeSegments;
+					netNumberForString(selectedNetwork, &address, &mask);
+					prefixLen = FindRightBit(mask, 32);
+					// convert address to PTR format
+					reverse = swap32(address);
+					str = stringForIP(reverse);
+					// remove segments from right
+					removeSegments = prefixLen/8;
+					for (j=0; j<removeSegments; j++) {
+						range = [str rangeOfString:@"." options:NSBackwardsSearch];	// remove as needed
+						str = [str substringToIndex:range.location];
+					}					
+					// gateway.zone --> selectedNetwork
+					pad1 = [pad substringToIndex:17-[str length]];
+					pad2 = [pad substringToIndex:16-[zoneName length]];
+					line = [NSString stringWithFormat:
+						@"%@ %@IN PTR  gateway.%@. %@;IPNR_PTR;",str,pad1,zoneName,pad2];
+					[newList addObject:line]; 
+					// get other names and addresses from selectedSet table
+					NSMutableDictionary* mySet = [[self localHostNames] objectForKey:selectedNetwork];
+					if (mySet) {
+						NSEnumerator* en = [mySet keyEnumerator];
+						NSString* name;
+						NSString* ipAddress;
+						while (name = [en nextObject]) {
+							ipAddress = [mySet objectForKey:name];
+							// convert address to PTR format
+							address = ipForString(ipAddress);
+							reverse = swap32(address);
+							ipAddress = stringForIP(reverse);
+								// remove segments from right
+							removeSegments = prefixLen/8;
+							for (j=0; j<removeSegments; j++) {
+								range = [ipAddress rangeOfString:@"." options:NSBackwardsSearch];	// remove as needed
+								ipAddress = [ipAddress substringToIndex:range.location];
+							}												
+							// layout text
+							pad1 = [pad substringToIndex:23-([name length]+[zoneName length])];
+							pad2 = [pad substringToIndex:17-[ipAddress length]];
+							line = [NSString stringWithFormat:
+								@"%@ %@IN PTR  %@.%@. %@;IPNR_PTR;",ipAddress,pad2,name,zoneName,pad1];
+							[newList addObject:line];
+						}
+					}
+				}
+			}	// insert DNS PTR records
+			[newList addObject:@";IPNR_PTR; PTR record place-holder (define reverse DNS for hosts on your LAN)"];
+		}
+		else [newList addObject:line];	// just copy line as is
+	}
+	rtext = [newList componentsJoinedByString:@"\n"];
+	[templateEdit setObject:rtext forKey:zone];
+	str = [NSString stringWithFormat:@"Template %@ filled.",zone];
+	[self updateParameter:@"statusInfo" withObject:str];
+	[[SentryLogger sharedInstance] logMessage:str];
+}
+
+// ---------------------------------------------------------------------------------
+//	• internals
+// ---------------------------------------------------------------------------------
+// return list of internal networks
+- (NSArray *)internals
+{
+	NSArray* interfaceArray = [[InterfaceTable sharedInstance] interfaceArray];
+	NSMutableArray* list = [NSMutableArray arrayWithCapacity:6];
+	NSEnumerator* en = [interfaceArray objectEnumerator];
+	InterfaceEntry* entry;
+	while (entry = [en nextObject]) {
+		// if entry is available
+		if (![[entry ifNet] isEqualTo:kSCNotAvailable]) {
+			// internal and not loopback
+			if (![[entry externalOn] intValue] && ![[entry interfaceID] isEqualTo:@"lo0"]) {
+				[list addObject:[entry ifNet]];
+			}
+		}
+	}
+	return list;
+}
+
+// ---------------------------------------------------------------------------------
+//	• enabledInternals
+// ---------------------------------------------------------------------------------
+// return list of internal networks
+- (NSArray *)enabledInternals
+{
+	NSArray* interfaceArray = [[InterfaceTable sharedInstance] interfaceArray];
+	NSMutableArray* list = [NSMutableArray arrayWithCapacity:6];
+	NSEnumerator* en = [interfaceArray objectEnumerator];
+	InterfaceEntry* entry;
+	NSString* str;
+	NSDictionary* localCachingOn = [self localCachingOn];
+	while (entry = [en nextObject]) {
+		// if entry is available
+		if (![[entry ifNet] isEqualTo:kSCNotAvailable]) {
+			// internal and not loopback
+			if (![[entry externalOn] intValue] && ![[entry interfaceID] isEqualTo:@"lo0"]) {
+				// check if enabled
+				str = [entry ifNet];
+				if ([[localCachingOn objectForKey:str] intValue]) [list addObject:str];
+			}
+		}
+	}
+	return list;
+}
+
+// ---------------------------------------------------------------------------------
+//	• externals
+// ---------------------------------------------------------------------------------
+// return list of external networks
+- (NSArray *)externals
+{
+	NSArray* interfaceArray = [[InterfaceTable sharedInstance] interfaceArray];
+	NSMutableArray* list = [NSMutableArray arrayWithCapacity:6];
+	NSEnumerator* en = [interfaceArray objectEnumerator];
+	InterfaceEntry* entry;
+	while (entry = [en nextObject]) {
+		// if entry is available
+		if (![[entry ifNet] isEqualTo:kSCNotAvailable]) {
+			// external and not loopback
+			if ([[entry externalOn] intValue] && ![[entry interfaceID] isEqualTo:@"lo0"]) {
+				[list addObject:[entry ifNet]];
+			}
+		}
+	}
+	return list;
+}
+
+
+#pragma mark -- actions --
+// ---------------------------------------------------------------------------------
+//	• nameServiceSave
+// ---------------------------------------------------------------------------------
+- (void)nameServiceSave
+{
+	// get nameServiceDictionary, allocate if needed;
+	SentryState* sentryState = [[SentryModel sharedInstance] sentryState];
+	NSMutableDictionary* nameServiceDictionary = [sentryState nameServiceDictionary];
+	if (!nameServiceDictionary) {
+		nameServiceDictionary = [[NSMutableDictionary alloc] init];
+		[sentryState setNameServiceDictionary:nameServiceDictionary];
+	}
+	// transfer current settings to dictionary
+	[nameServiceDictionary setObject:templateActive forKey:SS_templateSaved];
+	[nameServiceDictionary setObject:[self localCachingOn] forKey:SS_localCachingOn];
+	[nameServiceDictionary setObject:[self zoneNames] forKey:SS_zoneNames];
+	[nameServiceDictionary setObject:[self nameServiceOn] forKey:SS_nameServiceOn];
+	[self updateParameter:@"statusInfo" withObject:@"Settings saved."];
+	// perform application save
+	[[AppDelegate sharedInstance] saveDocument:self];
+}
+
+// ---------------------------------------------------------------------------------
+//	• nameServiceRestore
+// ---------------------------------------------------------------------------------
+- (void)nameServiceRestore
+{
+	// get nameServiceDictionary, allocate if needed;
+	SentryState* sentryState = [[SentryModel sharedInstance] sentryState];
+	NSMutableDictionary* nameServiceDictionary = [sentryState nameServiceDictionary];
+	if (!nameServiceDictionary) {
+		nameServiceDictionary = [[NSMutableDictionary alloc] init];
+		[sentryState setNameServiceDictionary:nameServiceDictionary];
+	}
+	
+	// allocate and load default template dictionary if needed
+	if (!templateDefault) {
+		NSMutableDictionary* temp = [[[NSMutableDictionary alloc] init] autorelease];	
+		// get default templates
+		NSEnumerator* en;
+		NSString* path;
+		NSString* text;
+		NSString* key;
+		NSArray* list = [[NSBundle mainBundle] pathsForResourcesOfType:@"" inDirectory:@"named_ipnr"];
+		en = [list objectEnumerator];
+		while (path = [en nextObject]) {
+			text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+			key = [path lastPathComponent];
+			if (text) [temp setObject:text forKey:key];
+		}
+		// try to update named.cache
+//		text = [NSString stringWithContentsOfURL:
+//			[NSURL URLWithString:@"ftp://ftp.rs.internic.net/domain/named.cache"]];
+//		if (text) [temp setObject:text forKey:@"named.cache"];
+		// setTemplateDefault
+		[self setTemplateDefault:temp];
+	}
+	// override defaults with any previously saved settings
+		// read templateSaved
+	[self setTemplateActive:[nameServiceDictionary objectForKey:SS_templateSaved]];
+		// if empty, use templateDefault
+	if (![[templateActive objectForKey:@"named.cache"] length]) [self setTemplateActive:templateDefault];
+		// load templateEdit with templateActive
+	[self setTemplateEdit:templateActive];
+		// read localCachingOn
+	[self setLocalCachingOn:[nameServiceDictionary objectForKey:SS_localCachingOn]];
+		// read zoneNames
+	[self setZoneNames:[nameServiceDictionary objectForKey:SS_zoneNames]];
+	// start selected name service if any
+	BOOL enabled = NO;
+	NSEnumerator* en = [[self localCachingOn] objectEnumerator];
+	NSNumber* num;
+	while (num = [en nextObject]) {
+		if ([num intValue]) {
+			enabled = YES;
+			break;
+		}
+	}
+	if (enabled) [self setNameServiceOn:[nameServiceDictionary objectForKey:SS_nameServiceOn]];
+	[self updateParameter:@"statusInfo" withObject:@"Settings restored from application state."];
+}
+
+// ---------------------------------------------------------------------------------
+//	• nameServiceApply
+// ---------------------------------------------------------------------------------
+// apply our current configuration (templateActive)
+// by writing to /tmp/named_ipnr and then cp to /var/named_ipnr
+- (void)nameServiceApply
+{
+	BOOL flag = YES;
+	NSFileManager* fm = [NSFileManager defaultManager];
+	NSString* pathA;
+	NSString* filePath;
+	NSString* fileName;
+	NSString* fileText;
+	NSEnumerator* en;
+	NSString* network;
+	NSString* zoneName;
+	NSString* zoneFile;
+	int result;
+
+	do {	
+		// update template files from current model
+		[self doTemplate_named_conf];
+		en = [[self enabledInternals] objectEnumerator];
+		while (network = [en nextObject]) {
+			zoneName = [self zoneNameForNetwork:network];
+			zoneFile = [NSString stringWithFormat:@"%@.zone",zoneName];
+			[self doTemplate_zone:zoneFile];
+			zoneFile = [NSString stringWithFormat:@"%@.rev",zoneName];
+			[self doTemplate_zone:zoneFile];
+		}
+		// copy templateEdit to templateActive
+		[self setTemplateActive:[self templateEdit]];
+		
+		[self updateParameter:@"refreshTemplate" withObject:@"refreshTemplate"];
+		// create directory at /tmp/named_ipnr if needed
+		pathA = @"/tmp/named_ipnr";
+		if (![fm fileExistsAtPath:pathA isDirectory:&flag]) {
+			flag = [fm createDirectoryAtPath:pathA attributes:nil];
+		}
+		// get files in templateActive and save to /tmp/named_ipnr
+		en = [templateActive keyEnumerator];
+		while (fileName = [en nextObject]) {
+			filePath = [pathA stringByAppendingPathComponent:fileName];
+			fileText = [templateActive objectForKey:fileName];
+			[fileText writeToFile:filePath atomically:NO encoding:NSUTF8StringEncoding error:nil];
+		}
+
+		// get runNamedPath if needed
+		[self runNamedPath];
+
+		// now move them to /var/named_ipnr
+			// invoke helper to perform copy
+		NSArray* args = [NSArray arrayWithObjects:@"-apply", nil];
+		result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+		if (result < 0) {
+			[self updateParameter:@"statusInfo" withObject:@"-apply named failed"];
+			break;
+		}
+		// allow file system to stabilize for consistency
+		[NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.1]];
+		
+		// tell named to read the new config
+		if ([self namedIsRunning]) {
+			args = [NSArray arrayWithObjects:@"-reload", nil];
+			result = [AppSupport doTask:runNamedPath arguments:args output:nil];
+			if (result < 0) {
+				[self updateParameter:@"statusInfo" withObject:@"-reload named failed"];
+				break;
+			}
+		}
+		[self updateParameter:@"statusInfo" withObject:@"Settings applied to named"];
+		[[SentryLogger sharedInstance] logMessage:@"\nSettings applied to named"];
+		// update DHCP Server as needed
+		[[DHCPController sharedInstance] receiveDictionary:
+			[NSDictionary dictionaryWithObject:DS_updateHostDNS forKey:DS_updateHostDNS]];
+	} while (false);
+}
+
+
+#pragma mark -- observer interface --
+// ---------------------------------------------------------------------------------
+//	• addObserver
+// ---------------------------------------------------------------------------------
+- (void)addObserver:(id)target withSelector:(SEL)method {
+    [[NSNotificationCenter defaultCenter] addObserver:target 
+    selector:method 
+    name:NameServiceNotification 
+    object:self];
+}
+
+// ---------------------------------------------------------------------------------
+//	• removeObserver
+// ---------------------------------------------------------------------------------
+- (void)removeObserver:(id)target {
+    [[NSNotificationCenter defaultCenter] removeObserver:target
+        name:NameServiceNotification
+        object:self];
+}
+
+// ---------------------------------------------------------------------------------
+//	• updateParameter
+// ---------------------------------------------------------------------------------
+// Notify listeners when state changes
+- (BOOL)updateParameter:(NSString *)name withObject:(id)anObject
+{
+    NSDictionary* myDictionary;
+	myDictionary = [[NSDictionary alloc] initWithObjectsAndKeys:anObject, name, nil];
+	// notify listeners with dictionary
+	[[NSNotificationCenter defaultCenter]
+		postNotificationName:NameServiceNotification
+		object:self
+		userInfo:myDictionary];		
+	[myDictionary release];
+	return YES;
+}
+
+@end

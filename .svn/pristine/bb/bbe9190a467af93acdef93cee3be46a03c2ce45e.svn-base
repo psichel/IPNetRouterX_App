@@ -1,0 +1,15 @@
+;-----------------------------------------------------------------------------
+; localhost.zone - used to define the "localhost" entry for the host
+; running the name server software.
+;-----------------------------------------------------------------------------
+$TTL	86400 ;
+; could use $ORIGIN localhost.
+@       IN SOA     localhost. root.localhost.  (
+				   2006092900	;IPNR_serial; YYYYMMDDxx
+                   1h			; refresh after 1 hour
+                   15m			; retry after 15 minutes
+                   1w			; expire after 1 week
+                   1h )			; minimum TTL of 1 hour
+
+				IN NS   localhost.
+localhost.		IN A    127.0.0.1

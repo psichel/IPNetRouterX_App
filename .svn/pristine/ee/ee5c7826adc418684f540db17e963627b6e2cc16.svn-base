@@ -1,0 +1,40 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {
+                arpAddButton = id; 
+                arpDeleteButton = id; 
+                arpListButton = id; 
+                myHelp = id; 
+                routeAddButton = id; 
+                routeChangeButton = id; 
+                routeDeleteButton = id; 
+                routeListButton = id; 
+            }; 
+            CLASS = RoutesWindowC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                arpCommentField = NSTextField; 
+                arpHWAddressField = NSTextField; 
+                arpIPAddressField = NSTextField; 
+                arpListButton = NSButton; 
+                arpPermButton = NSButton; 
+                arpPublishButton = NSButton; 
+                arpTableView = NSTableView; 
+                routeComment = NSTextField; 
+                routeDestinationField = NSTextField; 
+                routeGatewayField = NSTextField; 
+                routeListButton = NSButton; 
+                routeNetworkPortPopUp = NSPopUpButton; 
+                routeTableView = NSTableView; 
+                routeTypePopUp = NSPopUpButton; 
+                statusInfo = NSTextField; 
+                tabView = NSTabView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = TableData; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

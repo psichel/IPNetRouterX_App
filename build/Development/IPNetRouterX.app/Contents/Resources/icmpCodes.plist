@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>0</key>
+	<string>network unreachable</string>
+	<key>1</key>
+	<string>host unreachable</string>
+	<key>10</key>
+	<string>destination host admin restricted</string>
+	<key>13</key>
+	<string>communication admin filtered</string>
+	<key>2</key>
+	<string>protocol unreachable</string>
+	<key>3</key>
+	<string>port unreachable</string>
+	<key>6</key>
+	<string>network unknown</string>
+	<key>7</key>
+	<string>destination host unknown</string>
+	<key>9</key>
+	<string>destination network admin restricted</string>
+</dict>
+</plist>

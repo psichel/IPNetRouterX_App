@@ -1,0 +1,277 @@
+//
+//  TDMinuteGroup.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on 3/1/06.
+//  Copyright 2006 Sustainable Softworks Inc. All rights reserved.
+//
+
+#import "TrafficDiscoveryModel.h"
+#import "TDMinuteGroup.h"
+#import "TDHourGroup.h"
+#import "TDEntry.h"
+#import "IPSupport.h"
+
+// Private Methods
+@interface TDMinuteGroup (PrivateMethods)
+@end
+
+@implementation TDMinuteGroup
+
+// ---------------------------------------------------------------------------------
+//	• init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+    if (self = [super init]) {
+        // initialize our instance variables
+		bzero(&sampleData, sizeof(minuteSample_t));
+		sampleData.length = sizeof(minuteSample_t);
+		sampleData.type = kIntervalSecond;
+		sampleData.version = kSampleDataVersion;
+		identifier = nil;
+		bsdName = nil;
+		hourGroup = nil;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	• dealloc
+// ---------------------------------------------------------------------------------
+- (void)dealloc {
+	[self setIdentifier:nil];
+	[self setBsdName:nil];
+	hourGroup = nil;
+	[super dealloc];
+}
+
+#pragma mark -- save and restore --
+// ---------------------------------------------------------------------------------
+//	• dictionary
+// ---------------------------------------------------------------------------------
+- (NSDictionary*)dictionary
+{
+	NSData* myData = [NSData dataWithBytes:&sampleData length:sizeof(minuteSample_t)];
+	return [NSDictionary dictionaryWithObjectsAndKeys:
+		myData,@"sampleData",
+		identifier,@"identifier",
+		bsdName,@"bsdName",
+		nil];
+}
+
+// ---------------------------------------------------------------------------------
+//	• objectFromDictionary
+// ---------------------------------------------------------------------------------
++ (TDMinuteGroup*)objectFromDictionary:(NSDictionary*)inDictionary
+{
+	TDMinuteGroup* object = [[TDMinuteGroup alloc] init];
+	[object setSampleData:[inDictionary objectForKey:@"sampleData"]];
+	[object setIdentifier:[inDictionary objectForKey:@"identifier"]];
+	[object setBsdName:[inDictionary objectForKey:@"bsdName"]];
+	return [object autorelease];
+}
+- (void)setSampleData:(NSData*)inData
+{
+	// check for compatible version
+	minuteSample_t* dp;
+	dp = (minuteSample_t *const)[inData bytes];
+	if (dp->version == kSampleDataVersion) {	
+		int length = [inData length];
+		if (length > sizeof(minuteSample_t)) length = sizeof(minuteSample_t);
+		memcpy(&sampleData, [inData bytes], length);
+		if (length < sizeof(minuteSample_t)) {
+			int delta = sizeof(minuteSample_t) - length;
+			u_int8_t* dp = (u_int8_t*)&sampleData;
+			bzero(&dp[length], delta);
+		}
+	}
+}
+
+#pragma mark -- accessors --
+- (NSString*)identifier { return identifier; }
+- (void)setIdentifier:(NSString*)value
+{
+	[value retain];
+	[identifier release];
+	identifier = value;
+}
+
+- (NSString*)bsdName { return bsdName; }
+- (void)setBsdName:(NSString*)value
+{
+	[value retain];
+	[bsdName release];
+	bsdName = value;
+}
+
+- (TDHourGroup*)hourGroup { return hourGroup; }
+- (void)setHourGroup:(TDHourGroup *)value
+{
+	// not retained to avoid loop
+	hourGroup = value;
+}
+
+- (int)minuteOfHour { return sampleData.minuteOfHour; }
+- (void)setMinuteOfHour:(int)value {
+	sampleData.minuteOfHour = value;
+}
+
+#pragma mark -- data access --
+// ---------------------------------------------------------------------------------
+//	• tdEntryForIndex
+// ---------------------------------------------------------------------------------
+- (TDEntry*)tdEntryForIndex:(unsigned)index
+{
+	TDEntry* tdEntry = [[[TDEntry alloc] init] autorelease];
+	[tdEntry setDataIndex:index];
+	// bytes
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.bytesIn[index]] forKey:TDE_bytesIn];
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.bytesOut[index]] forKey:TDE_bytesOut];
+	// total
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.totalIn] forKey:TDE_totalIn];
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.totalOut] forKey:TDE_totalOut];
+	// max
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.maxIn] forKey:TDE_maxIn];
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.maxOut] forKey:TDE_maxOut];
+	
+	[tdEntry setValue:identifier forKey:TDE_identifier];
+	[tdEntry setValue:bsdName forKey:TDE_bsdName];
+	// service
+	[tdEntry setValue:identifier forKey:TDE_service];
+
+	return tdEntry;
+}
+
+- (int)bytesInForIndex:(unsigned)index { return sampleData.bytesIn[index]; }
+- (int)bytesOutForIndex:(unsigned)index { return sampleData.bytesOut[index]; }
+- (int32_t)totalIn { return sampleData.totalIn; }
+- (int32_t)totalOut { return sampleData.totalOut; }
+- (int32_t)maxIn { return sampleData.maxIn; }
+- (int32_t)maxOut { return sampleData.maxOut; }
+
+// ---------------------------------------------------------------------------------
+//	• tdEntryRecentForIndex
+// ---------------------------------------------------------------------------------
+// When interval second is used for sorting, recent data from the last 5 seconds
+- (TDEntry*)tdEntryRecentForIndex:(unsigned)index
+{
+	TDEntry* tdEntry = [[[TDEntry alloc] init] autorelease];
+	[tdEntry setDataIndex:index];
+	// recent bytes
+	NSRange range;
+	int sumIn, sumOut;
+	if (index >= 5) {
+		range.location = index-5;
+		range.length = 5;
+		sumIn = [self bytesInForIndexRange:range];
+		[tdEntry setValue:[NSNumber numberWithInt:sumIn] forKey:TDE_bytesIn];
+		sumOut = [self bytesOutForIndexRange:range];
+		[tdEntry setValue:[NSNumber numberWithInt:sumOut] forKey:TDE_bytesOut];
+	}
+	else {
+		TDMinuteGroup* previous = [self previousGroup];
+		range.location = 0;
+		range.length = index;
+		sumIn = [self bytesInForIndexRange:range];
+		sumOut = [self bytesOutForIndexRange:range];
+		int borrow = 5 - index;
+		range.location = kTDSecondsOfMinute - borrow;
+		range.length = borrow;
+		sumIn += [previous bytesInForIndexRange:range];
+		sumOut += [previous bytesOutForIndexRange:range];
+		[tdEntry setValue:[NSNumber numberWithInt:sumIn] forKey:TDE_bytesIn];
+		[tdEntry setValue:[NSNumber numberWithInt:sumOut] forKey:TDE_bytesOut];
+	}
+	// total
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.totalIn] forKey:TDE_totalIn];
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.totalOut] forKey:TDE_totalOut];
+	// max
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.maxIn] forKey:TDE_maxIn];
+	[tdEntry setValue:[NSNumber numberWithInt:sampleData.maxOut] forKey:TDE_maxOut];
+	
+	[tdEntry setValue:identifier forKey:TDE_identifier];
+	[tdEntry setValue:bsdName forKey:TDE_bsdName];
+	// service
+	[tdEntry setValue:identifier forKey:TDE_service];
+
+	return tdEntry;
+}
+
+// ---------------------------------------------------------------------------------
+//	• bytesInForIndexRange
+// ---------------------------------------------------------------------------------
+- (int)bytesInForIndexRange:(NSRange)range
+{
+	int i, limit, sum;
+	sum = 0;
+	limit = range.location + range.length;
+	for (i=range.location; i<limit; i++) sum += sampleData.bytesIn[i];
+	return sum;
+}
+- (int)bytesOutForIndexRange:(NSRange)range
+{
+	int i, limit, sum;
+	sum = 0;
+	limit = range.location + range.length;
+	for (i=range.location; i<limit; i++) sum += sampleData.bytesOut[i];
+	return sum;
+}
+
+#pragma mark -- action --
+// ---------------------------------------------------------------------------------
+//	• addSample
+// ---------------------------------------------------------------------------------
+// A connection entry sample just arrived, add it to our data store.
+// The bytesIn and bytesOut counts are relative to the Local host.
+- (BOOL)addSample:(KFT_trafficEntry_t*)tEntry forDate:(NSCalendarDate*)trafficDiscoveryTime
+{
+	// sample identification
+	int index = [trafficDiscoveryTime secondOfMinute];
+	// [self identifier] was set when object allocated
+	
+	// record traffic increment
+	sampleData.bytesIn[index] += tEntry->dataIn.delta;
+	sampleData.bytesOut[index] += tEntry->dataOut.delta;
+	// update max, total, and ave stats
+	if (sampleData.maxIn < tEntry->dataIn.delta) sampleData.maxIn = tEntry->dataIn.delta;
+	if (sampleData.maxOut < tEntry->dataOut.delta) sampleData.maxOut = tEntry->dataOut.delta;
+	sampleData.totalIn += tEntry->dataIn.delta;
+	sampleData.totalOut += tEntry->dataOut.delta;
+	// remember interface
+	if (![bsdName length]) {
+		[self setBsdName:[NSString stringWithCString:tEntry->bsdName encoding:NSUTF8StringEncoding]];
+		[hourGroup setBsdName:bsdName];
+	}
+	// tell hour group we have new data
+	[hourGroup setNeedsUpdate:YES];
+	
+	return YES;
+}
+
+// ---------------------------------------------------------------------------------
+//	• previousGroup
+// ---------------------------------------------------------------------------------
+- (TDMinuteGroup*)previousGroup
+{
+	TDMinuteGroup* returnValue = nil;
+	int minute = sampleData.minuteOfHour;
+	if (minute > 0) {
+		minute -= 1;
+		returnValue = [hourGroup minuteGroupForIndex:minute allocate:NO];
+	}
+	else {
+		minute = 59;
+		int hour = [hourGroup hourOfDay];
+		if (hour > 0) {
+			hour -= 1;
+			TDDayGroup* dayGroup = [hourGroup dayGroup];
+			TDHourGroup* prevHourGroup = [dayGroup hourGroupForIndex:hour allocate:NO];
+			returnValue = [prevHourGroup minuteGroupForIndex:minute allocate:NO];
+		}
+		// punt at midnight, there is no previous minute group for this day
+	}
+	return returnValue;
+}
+
+@end

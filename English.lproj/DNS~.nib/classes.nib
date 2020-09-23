@@ -1,0 +1,35 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {
+                applyNow = id; 
+                resetToDefault = id; 
+                revert = id; 
+                start = id; 
+                templateFile = id; 
+            }; 
+            CLASS = DnsWC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                applyNow = NSButton; 
+                localCachingNameServer = NSButton; 
+                nameServerState = NSTextField; 
+                networksServed = NSTextView; 
+                start = NSButton; 
+                stateDescription = NSTextField; 
+                statusInfo = NSTextField; 
+                tabView = NSTabView; 
+                template = NSTextView; 
+                templateFile = NSPopUpButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

@@ -1,0 +1,373 @@
+//
+//  IPNetServer.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on 5/17/06.
+//  Copyright 2006 Sustainable Softworks. All rights reserved.
+//
+// IPNetServer encapsulates receiving and responding to remote app
+// control messages from a GUI network client.
+//
+// TCPServer binds the requested socket and listens for connections.
+// IPNetServer configures and advertises the service we want to implement,
+// and handles new connections by allocating a TCPConnection and wiring
+// the associated streams.
+// A TCPConnection delegate or subclass (ServiceDispatch) parses rx data
+// as it arrives, and directs it to the requested object through a ServiceNub.
+// The ServiceNub stores the "replyTo" tag to direct responses
+// back to the requesting client through the corresponding connection.
+// ServiceDispatch keeps a table of services as a dictionary of
+// ServiceNubs keyed by target identifier, creating or removing
+// services as requested.
+
+#import "IPNetServer.h"
+#import "ServiceNub.h"
+#if !DHCPServer_app
+#import "SentryController.h"
+#endif
+#if IPNetRouter
+//#import "DHCPServer.h"
+#endif
+
+@interface IPNetServer (PrivateMethods)
+- (void)TCPConnection:(TCPConnection *)connection dispatchMessage:(NSMutableDictionary *)message;
+@end
+
+@implementation IPNetServer
+
++ (IPNetServer *)sharedInstance {
+	static id sharedTask = nil;
+	
+	if(sharedTask==nil) {
+		sharedTask = [[IPNetServer alloc] init];
+	}
+	return sharedTask;
+}
+
+// ---------------------------------------------------------------------------------
+//	• init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+    if (self = [super init]) {
+        // initialize our instance variables
+		connectionList = nil;
+		messageD = nil;
+		lastOffset = 0;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	• dealloc
+// ---------------------------------------------------------------------------------
+- (void)dealloc {
+	[connectionList release]; connectionList = nil;
+	[messageD release]; messageD = nil;
+	[super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	• startServing
+// ---------------------------------------------------------------------------------
+- (void)startServing
+{
+	BOOL result;
+	NSError* error = nil;
+	[self setPort:IPNetPort];
+	// setup to publish our service using Bonjour (instance name, service type, domain)
+	// <computer_name>._ipnr._tcp.local.
+	[self setDomain:@"local."];
+	[self setType:@"_ipnr._tcp"];
+	[self setName:@""];	// empty string meaning use "Computer name"
+	// zero offset into to receive buffer
+	lastOffset = 0;
+	// start server
+	result = [self start:&error];
+	if (result == NO) {
+		NSLog(@"IPNetServer previous instance detected.");
+		//if (error) NSLog([error localizedDescription]);
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	• stopServing
+// ---------------------------------------------------------------------------------
+- (void)stopServing
+{
+	// invalidate all connections
+	[connectionList release]; connectionList = nil;
+	[messageD release]; messageD = nil;
+	// stop serving
+	[self stop];
+}
+
+
+// ---------------------------------------------------------------------------------
+//	• TCPServer:didReceiveConnectionFromAddress:inputStream:outputStream
+// ---------------------------------------------------------------------------------
+- (void)handleNewConnectionFromAddress:(NSData *)addr inputStream:(NSInputStream *)istr outputStream:(NSOutputStream *)ostr {
+
+    TCPConnection *connection = [[TCPConnection alloc] initWithPeerAddress:addr inputStream:istr outputStream:ostr forServer:self];
+	// make ourselves the default connection delegate to parse data streams
+	[connection setDelegate:self];
+	// own our connections
+	if (!connectionList) connectionList = [[NSMutableArray alloc] init];
+	[connectionList addObject:connection];
+	[connection release];
+	
+	// call delegate if specified
+    if ([self delegate] && [[self delegate] respondsToSelector:@selector(IPNetServer:didMakeNewConnection:)]) { 
+        [[self delegate] IPNetServer:self didMakeNewConnection:connection];
+    }
+	// -- own our connections --
+    // The connection at this point is turned loose to exist on its
+    // own, and not released or autoreleased.  Alternatively, the
+    // IPNetServer could keep a list of connections, and TCPConnection
+    // would have to tell the server to delete one at invalidation
+    // time.  This would perhaps be more correct and ensure no
+    // spurious leaks get reported by the tools, but IPNetServer
+    // has nothing further it wants to do with the TCPConnections,
+    // and would just be "owning" the connections for form.
+
+}
+
+// ---------------------------------------------------------------------------------
+//	• connectionCount
+// ---------------------------------------------------------------------------------
+- (int)connectionCount
+{
+	return [connectionList count];
+}
+
+// ---------------------------------------------------------------------------------
+//	• releaseConnection
+// ---------------------------------------------------------------------------------
+// use [connection invalidate] to close connection which will call here to release it
+- (void)releaseConnection:(TCPConnection *)connection
+{
+	[connectionList removeObject:connection];
+}
+
+#pragma mark -- Message Dispatch --
+// ---------------------------------------------------------------------------------
+//	• TCPConnection:receiveData:
+// ---------------------------------------------------------------------------------
+// Return: YES return means that a complete request was parsed, and the caller
+// should call again as the buffered bytes may have another complete
+// request available.
+- (BOOL)TCPConnection:(TCPConnection *)connection receiveData:(NSMutableData *)inData {
+	BOOL returnValue = NO;
+	int result;
+	int startContent = 0;
+	int endContent = 0;
+	PSData inBuf;
+	PSRange range;
+	NSString* tag;
+	NSString* startTag = nil;
+	int size;
+	
+	// connection closing down?
+	if (!inData) {
+		[connection invalidate];
+		return NO;
+	}
+	// load up request dictionary from data
+	if (!messageD) {
+		messageD = [[NSMutableDictionary alloc] init];
+		lastOffset = 0;
+	}
+	inBuf.bytes = [inData mutableBytes];
+	inBuf.length = [inData length];
+	inBuf.bufferLength = inBuf.length;
+	inBuf.offset = lastOffset;
+	do {
+		tag = nil;
+		size = 0;
+		result = findTag(&inBuf, &range, &tag, &size);
+		if (result < 0) break;
+		if (result == 0) {
+			// found openning tag;
+			startContent = inBuf.offset;
+			if ([tag isEqualTo:kRequest]) {
+				// begin a new request
+				[messageD removeAllObjects];
+				[messageD setObject:kMessageStart forKey:kMessageStart];
+				continue;
+			}
+			// remember tag string
+			// No stack required since no other nesting is defined.  Ignore unmatched tags.
+			startTag = tag;
+			// skip size of enclosed data if specified
+			inBuf.offset += size;
+			if (inBuf.offset > inBuf.length) break;
+		}
+		else {
+			// found closing tag
+			if ([tag isEqualTo:kRequest]) {
+				// end of request
+				[messageD setObject:kMessageEnd forKey:kMessageEnd];
+				// remove upto closing tag from inData
+				int pos = range.location + range.length;		// end of closing tag
+				int len = [inData length] - pos;				// length of remaining bytes in buffer
+				memmove(inBuf.bytes, &inBuf.bytes[pos], len);	// slide data to start of buffer
+				[inData setLength:len];							// set new length
+				lastOffset = 0;									// reset offset
+					// don't need to reset inBuf.length since we're exiting to be called again
+				// indicate we parsed a complete request
+				returnValue = YES;
+				break;
+			}
+			// check for match
+			if ([tag isEqualTo:startTag]) {
+				// found tag pair, save data for key
+				endContent = range.location;	// start of tag found
+				NSData* content = [NSData dataWithBytes:&inBuf.bytes[startContent] length:endContent-startContent];
+				[messageD setObject:content forKey:startTag];
+				// don't reparse the same tag pair
+				lastOffset = range.location + range.length;
+			}
+		}
+	} while (inBuf.offset <= inBuf.length);
+	// do we have a complete request?
+	if ([messageD objectForKey:kMessageStart] && [messageD objectForKey:kMessageEnd]) {
+		// dispatch message
+		[self TCPConnection:connection dispatchMessage:messageD];
+	}
+
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	• dispatch message
+// ---------------------------------------------------------------------------------
+// Have a complete request with parameters in mutable dictionary as NSData objects for keys.
+// Extract parameter data as NSStrings or unarchived objects and invoke requested target
+// through corresponding ServiceNub.
+// Lookup ServiceNub in providerDictionary.  If not found, try to handle known targets
+// including "create" to create a new server in a detached thread.
+// Known targets: NKEServer, DHCPServer, createNewServer (object is name of server class)
+- (void)TCPConnection:(TCPConnection *)connection dispatchMessage:(NSMutableDictionary *)message
+{
+	NSData* temp;
+	NSString* target;
+	NSString* replyTo = nil;
+	NSString* serviceURL = nil;
+	id anObject = nil;
+	ServiceNub* serviceNub = nil;
+	
+	do {
+		// Extract parameter data
+		temp = [message objectForKey:kTarget];
+		if (!temp) break;
+		target = [[[NSString alloc] initWithData:temp encoding:NSUTF8StringEncoding] autorelease];
+		
+		temp = [message objectForKey:kReplyTo];
+		if (temp) replyTo = [[[NSString alloc] initWithData:temp encoding:NSUTF8StringEncoding] autorelease];
+		
+		temp = [message objectForKey:kServiceURL];
+		if (temp) serviceURL = [[[NSString alloc] initWithData:temp encoding:NSUTF8StringEncoding] autorelease];
+
+		temp = [message objectForKey:kWithObject];
+		if (temp) anObject = [NSKeyedUnarchiver unarchiveObjectWithData:temp];
+		
+		// look for ServiceNub
+		serviceNub = [connection providerForKey:target];
+		if (!serviceNub) {
+			if (0) ;
+#if !DHCPServer_app
+			else if ([target isEqualTo:@"NKEServer"]) {
+				serviceNub = [[ServiceNub alloc] initWithConnection:connection from:replyTo];
+				[serviceNub setServer:[SentryController sharedInstance]];
+				[connection setProvider:serviceNub forKey:target];
+			}
+#endif
+#if 0
+#if IPNetRouter
+			else if ([target isEqualTo:@"DHCPServer"]) {
+				serviceNub = [[ServiceNub alloc] initWithConnection:connection from:replyTo];
+				[serviceNub setServer:[DHCPServer sharedInstance]];
+				[connection setProvider:serviceNub forKey:target];
+			}
+#endif
+#endif
+			else if ([target isEqualTo:@"createNewServer"]) {
+				serviceNub = [[ServiceNub alloc] initWithConnection:connection from:replyTo];
+				Class serverClass = [self serverClassForName:target];
+				if ([serviceNub createNewServer:serverClass]) {
+					[connection setProvider:serviceNub forKey:target];
+				}
+				else {
+					[serviceNub release];	serviceNub = nil;
+				}
+			}
+		}
+		// invoke requested service
+		if (serviceNub) {
+			[[serviceNub server] startService:serviceURL fromController:serviceNub withObject:anObject];
+		}
+	} while (false);
+	[serviceNub release];	serviceNub = nil;
+}
+
+// ---------------------------------------------------------------------------------
+//	• serverClassForName
+// ---------------------------------------------------------------------------------
+// Find serviceClass pointer for class name.
+// Can either hard code, or keep a registry that other service providers load
+// [PAS] hard code for now
+- (Class)serverClassForName:(NSString *)name
+{
+	Class serverClass = nil;
+	
+	return serverClass;
+}
+
+@end
+
+
+// ---------------------------------------------------------------------------------
+//	• findTag
+// ---------------------------------------------------------------------------------
+// Find next tag in data
+// Return:
+// -1 not found
+// 0 tag found, offset advanced to just beyond end of tag
+// 1 </tag> closing tag found
+// 
+int findTag(PSData* inBuf, PSRange* outRange, NSString **tag, int *size)
+{
+	int returnValue = -1;
+	int start, end, pos;
+	PSRange range;
+	do {
+		start = findByte(inBuf, '<');
+		if (start < 0) break;
+		outRange->location = start;
+		end = findByte(inBuf, '>');
+		if (end < 0) break;
+		outRange->length = end - start + 1;
+		start += 1;		// skip opening <
+		// starting or ending?
+		if (inBuf->bytes[start] != '/') returnValue = 0;	// starting tag
+		else {
+			start += 1;
+			returnValue = 1;	// ending tag
+		}
+		// look for :size
+		pos = findByteInRange(inBuf, &range, ':');
+		if (pos >= 0) {
+			// extract size
+			range.location += 1;	// skip :
+			range.length = end - range.location;
+			int value = intValue(inBuf, &range);
+			if (size) *size = value;
+			// set end to point to :
+			end = pos;
+		}
+		if (tag) *tag = [NSString stringWithCString:(char *)&inBuf->bytes[start] length:(end - start)];
+		inBuf->offset += 1;	// skip closing >
+	} while (false);
+	return returnValue;
+}
+

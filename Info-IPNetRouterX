@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>ipnr</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>IPNetRouterX_doc</string>
+			<key>CFBundleTypeName</key>
+			<string>NetRouter Settings File</string>
+			<key>CFBundleTypeOSTypes</key>
+			<array>
+				<string>IPnl</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>NSDocumentClass</key>
+			<string>SentryDocument</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>nsy</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>IPNetRouterX_doc</string>
+			<key>CFBundleTypeName</key>
+			<string>NetSentry Settings File</string>
+			<key>CFBundleTypeOSTypes</key>
+			<array>
+				<string>NScp</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>NSDocumentClass</key>
+			<string>SentryDocument</string>
+		</dict>
+	</array>
+	<key>CFBundleExecutable</key>
+	<string>IPNetRouterX</string>
+	<key>CFBundleGetInfoString</key>
+	<string>1.6c2, Copyright 2003-2011 Sustainable Softworks Inc. All rights reserved.</string>
+	<key>CFBundleHelpBookFolder</key>
+	<string>IPNetRouterX Help</string>
+	<key>CFBundleHelpBookName</key>
+	<string>IPNetRouterX Help</string>
+	<key>CFBundleIconFile</key>
+	<string>IPNetRouterX</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.sustworks.IPNetRouterX</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>IPNetRouterX</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.6c2</string>
+	<key>CFBundleSignature</key>
+	<string>IPnl</string>
+	<key>CFBundleVersion</key>
+	<string>1.6c2</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSAppleScriptEnabled</key>
+	<string>YES</string>
+	<key>NSHelpFile</key>
+	<string>IPNetRouterX_help.html</string>
+	<key>NSMainNibFile</key>
+	<string>MainMenu</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>OSAScriptingDefinition</key>
+	<string>IPNetRouter.sdef</string>
+	<key>fileReleaseDateD</key>
+	<string>18</string>
+	<key>fileReleaseDateM</key>
+	<string>10</string>
+	<key>fileReleaseDateY</key>
+	<string>2011</string>
+</dict>
+</plist>

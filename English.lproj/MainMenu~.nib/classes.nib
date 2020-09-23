@@ -1,0 +1,172 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = AddressScanWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = AirPortConfigurationWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                checkForUpdate = id; 
+                configureAsStartupItem = id; 
+                connectToLocalServer = id; 
+                currentFilters = id; 
+                disconnect = id; 
+                license = id; 
+                myHelp = id; 
+                readMe = id; 
+                registration = id; 
+                releaseNotes = id; 
+                showHelp = id; 
+                unauthorizeTools = id; 
+                unloadNKE = id; 
+            }; 
+            CLASS = AppDelegate; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                addressScanWindowM = AddressScanWindowM; 
+                dhcpLogWindowM = DHCPLogWindowM; 
+                dhcpServerWindowM = DHCPServerWindowM; 
+                licenseCopies = id; 
+                licenseName = id; 
+                licenseOrganization = id; 
+                lookupWindowM = LookupWindowM; 
+                menuDisplatch = MenuDispatch; 
+                natViewWindowM = NATViewWindowM; 
+                routeWindowM = RouteWindowM; 
+                sentryLogWindowM = SentryLogWindowM; 
+                splashWindow = id; 
+                subnetWindowM = SubnetWindowM; 
+                tcpDumpWindowM = TCPDumpWindowM; 
+                version = id; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {Cancel = id; Connect = id; }; 
+            CLASS = ConnectToServer; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {password = NSSecureTextField; server = NSTextField; userName = NSTextField; }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = DHCPLogWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = DHCPServerWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                historyAdd = id; 
+                historyAddFavorite = id; 
+                historyClear = id; 
+                historyClearFavorites = id; 
+                historyRemove = id; 
+            }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = LookupWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                administratorsShowWindow = id; 
+                airPortConfigurationShowWindow = id; 
+                alternateRouteShowWindow = id; 
+                basicSetupShowWindow = id; 
+                connectToLocalServer = id; 
+                connectToServerShowWindow = id; 
+                diagnosticShowWindow = id; 
+                disconnect = id; 
+                expertViewShowWindow = id; 
+                failoverLocationsShowWindow = id; 
+                nameServiceShowWindow = id; 
+                preferencesShowWindow = id; 
+                registrationShowWindow = id; 
+                trafficDiscoveryShowWindow = id; 
+            }; 
+            CLASS = MenuDispatch; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = NATViewWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = NSApplication; LANGUAGE = ObjC; SUPERCLASS = NSResponder; }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = PreferencesWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = RegistrationWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = RouteWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = SentryLogWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = SubnetWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = TCPDumpWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {addButton = id; deleteButton = id; findTextField = id; }; 
+            CLASS = Users; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                deleteButton = NSButton; 
+                findTextField = NSTextField; 
+                tableView = NSTableView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {showWindow = id; }; 
+            CLASS = WhoIsWindowM; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

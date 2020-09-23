@@ -1,0 +1,289 @@
+//
+//  HardwareAddress.m
+//  IPNetRouterX
+//
+//  Created by psichel on Thu Nov 6 2003.
+//  Copyright (c) 2003 Sustainable Softworks Inc. All rights reserved.
+//
+
+#import "HardwareAddress.h"
+#import "HardwareAddressFormatter.h"
+//#import "PSServiceDictionary.h"
+#import "IPSupport.h"
+#import "kftSupport.h"
+#import "arp.h"
+#import "ArpOutput.h"
+#import <string.h>
+#import <net/ethernet.h>
+
+@implementation HardwareAddress
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init {
+    if (self = [super init]) {
+        bzero(&hardwareAddress, sizeof(EthernetAddress_t));
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ hardwareAddress
+// ---------------------------------------------------------------------------------
+- (EthernetAddress_t *)hardwareAddress
+{
+	return &hardwareAddress;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ setHardwareAddress
+// ---------------------------------------------------------------------------------
+- (void)setHardwareAddress:(EthernetAddress_t *)inValue
+{
+	memcpy(&hardwareAddress, inValue, sizeof(EthernetAddress_t));
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ getHardwareAddress
+// ---------------------------------------------------------------------------------
+- (void)getHardwareAddress:(EthernetAddress_t *)outValue
+{
+	memcpy(outValue, &hardwareAddress, sizeof(EthernetAddress_t));
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ stringValue
+// ---------------------------------------------------------------------------------
+- (NSString *)stringValue
+{
+    NSString* returnValue;
+    HardwareAddressFormatter* maf;
+    maf = [HardwareAddressFormatter sharedInstance];
+    returnValue = [maf stringForObjectValue:self];
+    return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ setStringValue
+// ---------------------------------------------------------------------------------
+- (BOOL)setStringValue:(NSString *)inValue
+{
+    BOOL returnValue = NO;
+	HardwareAddress* macValue = nil;
+	NSString* errorStr;
+    HardwareAddressFormatter* maf;
+	
+	maf = [HardwareAddressFormatter sharedInstance];
+	returnValue = [maf getObjectValue:&macValue forString:inValue errorDescription:&errorStr];
+	if (returnValue) {
+		if (macValue) [self setHardwareAddress:[macValue hardwareAddress]];
+	}
+	else NSLog(errorStr);	
+	return returnValue;
+}
+
+// <NSCopying>
+- (const void *)bytes {
+    return &hardwareAddress;
+}
+
+- (unsigned)length {
+    return sizeof(EthernetAddress_t);
+}
+
+- (NSString *)description {
+    return [self stringValue];
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+    HardwareAddress *copy;
+    copy = [[HardwareAddress allocWithZone:zone] init];
+    //[copy setHardwareAddress:&hardwareAddress];
+    memcpy((void*)[copy bytes], &hardwareAddress, [self length]);
+    return copy;
+}
+@end
+
+
+// ---------------------------------------------------------------------------------
+//	hwAddressForIP
+// ---------------------------------------------------------------------------------
+// find Ethernet MAC address for IP address if any
+//  input: ipAddress, buffer to receive hwAddress, length of buffer
+//  output: 0=success or other error, hwAddress buffer, hwAddressLen is length of hwAddress in buffer
+int hwAddressForIP(u_int32_t ipAddress, u_int8_t* hwAddress, u_int8_t* hwAddressLen)
+{
+	int returnValue = -1;
+	NSString* hwAddressString;
+	
+	if (*hwAddressLen >= ETHER_ADDR_LEN) {
+		hwAddressString = hwAddressStringForIPString( stringForIP(ipAddress) );
+		if ( eaForString(hwAddressString, (EthernetAddress_t*)hwAddress) ) {
+			*hwAddressLen = ETHER_ADDR_LEN;
+			returnValue = 0;
+		}
+	}
+	return returnValue;
+}
+
+
+
+// ---------------------------------------------------------------------------------
+//	hwAddressStringForIPString
+// ---------------------------------------------------------------------------------
+// find Ethernet MAC address for IP address if any
+NSString* hwAddressStringForIPString(NSString* ipAddress)
+{
+    NSString* returnValue = nil;
+//    NSString* path;
+//    NSArray* args;
+    NSString* str = nil;
+    NSRange range;
+//    NSScanner* theScanner;
+//    int p0, p1, p2, p3, p4, p5;
+	HardwareAddress* ha;
+    
+    do {
+        if (!ipAddress) break;
+//        path = @"/usr/sbin/arp";
+//        args = [NSArray arrayWithObject:ipAddress];
+//        str = [[AppDelegate sharedInstance] doTask:path arguments:args input:nil];
+		// discard any previous output
+		[[ArpOutput sharedInstance] setString:@""];
+		int argc;
+		char* argv[5];
+		argv[0] = "arp";
+		argv[1] = "arp";
+		argv[2] = (char *)[ipAddress UTF8String];
+		argc = 3;
+		argv[argc] = 0;
+		optind = 2;		//  initialize for getopt
+		// steal code from arp command (arp.c)
+		psArpMain(argc, argv);
+		str = [ArpOutput sharedInstance];
+        range = [str rangeOfString:@"at "];
+        if (!range.length) break;
+        str = [str substringFromIndex:range.location+range.length];
+		ha = [[[HardwareAddress alloc] init] autorelease];
+		if ([ha setStringValue:str]) {
+			returnValue = [ha stringValue];
+		}
+    } while (false);
+    return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//		¥ eaForString
+// ---------------------------------------------------------------------------
+// Convert Ethernet MAC address string to binary representation
+BOOL eaForString(NSString* inString, EthernetAddress_t* outBuf)
+{
+	BOOL returnValue = YES;
+	PSData inBuf;
+	PSRange range;
+	int i;
+	NSString* error;
+
+	if ([inString length]) {
+		inBuf.bytes = (u_int8_t*)[inString UTF8String];
+		inBuf.length = [inString length];
+		inBuf.bufferLength = inBuf.length;
+		range.location = 0;
+		range.length = inBuf.length;
+		
+		outBuf->octet[0] = intHexValue(&inBuf, &range);
+		for (i=1; i<6; i++) {
+			if ( !skipByte(&inBuf, &range, ':') && !skipByte(&inBuf, &range, '-') ) {
+				error = NSLocalizedString(@"HardwareAddressFormatter: invalid Ethernet address",
+					@"HardwareAddressFormatter: Ethernet address");
+				NSLog(error);
+				NSLog(inString);
+				returnValue = NO;
+				break;
+			}
+			outBuf->octet[i] = intHexValue(&inBuf, &range);
+		}
+	}
+	else returnValue = NO;
+	return (returnValue);
+}
+
+// ---------------------------------------------------------------------------
+//		¥ stringForEA
+// ---------------------------------------------------------------------------
+// Convert hardware address to string representation xx:xx:xx:xx:xx:xx
+NSString* stringForEA(EthernetAddress_t* ea)
+{
+	NSString* returnValue;
+	
+	returnValue = [NSString stringWithFormat:@"%02X:%02X:%02X:%02X:%02X:%02X",
+		ea->octet[0],ea->octet[1],ea->octet[2],ea->octet[3],ea->octet[4],ea->octet[5]];
+		
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//		¥ ha16ForString
+// ---------------------------------------------------------------------------
+// Convert hardware address string to binary representation
+// String can be 6 or 8 octets of the form xx:xx:xx
+// Upon return, *hlen is number of octets.
+BOOL ha16ForString(NSString* inString, HardwareAddress16_t* outBuf, int* hlen)
+{
+	BOOL returnValue = NO;
+	PSData inBuf;
+	PSRange range;
+	int i;
+	int count;
+	NSString* error;
+	
+	inBuf.bytes = (u_int8_t*)[inString UTF8String];
+	inBuf.length = [inString length];
+	inBuf.bufferLength = inBuf.length;
+	range.location = 0;
+	range.length = inBuf.length;
+	count = 0;	// default length to 0
+	*hlen = 0;
+	
+	outBuf->octet[0] = intHexValue(&inBuf, &range);
+	for (i=1; i<16; i++) {
+		// check for end of string
+		if (range.location >= inBuf.length) break;
+		// try to read next octet
+		if ( !skipByte(&inBuf, &range, ':') && !skipByte(&inBuf, &range, '-') ) {
+			if ((count != 6) && (count != 8)) {
+				error = NSLocalizedString(@"HardwareAddress: invalid Ethernet address",
+					@"HardwareAddress: invalid Ethernet address");
+				NSLog(error);
+				NSLog(inString);
+			}
+			break;
+		}
+		// end of string?
+		if (range.location >= inBuf.length) break;
+		// octet value
+		outBuf->octet[i] = intHexValue(&inBuf, &range);
+		count = i+1;
+	}
+	if ((count == 6) || (count == 8)) {
+		*hlen = count;
+		returnValue = YES;
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//		¥ stringForHA16
+// ---------------------------------------------------------------------------
+// Convert hardware address to string representation xx:xx:xx 1-16 octets
+NSString* stringForHA16(HardwareAddress16_t* ha, int hlen)
+{
+	NSMutableString* outString = [NSMutableString stringWithCapacity:64];
+	int i;
+	
+	[outString appendFormat:@"%02X", ha->octet[0]];
+	for (i=1; i<hlen; i++) {
+		[outString appendFormat:@":%02X", ha->octet[i]];
+	}
+	return (NSString *)outString;
+}

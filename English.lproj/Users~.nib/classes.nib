@@ -1,0 +1,17 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {addButton = id; deleteButton = id; findTextField = id; }; 
+            CLASS = Users; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                deleteButton = NSButton; 
+                findTextField = NSTextField; 
+                tableView = NSTableView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

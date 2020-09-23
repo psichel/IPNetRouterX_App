@@ -1,0 +1,992 @@
+//
+//  AppDelegate.m
+//  IPNetMonitorX, IPNetTunerX, IPNetSentryX, IPNetRouterX
+//
+//  Created by psichel on Sun Aug 19 2001.
+//  Copyright (c) 2001 Sustainable Softworks. All rights reserved.
+//
+//  Delegate of NSApplication used invoke startup processing
+#import "AppDelegate.h"
+#import "RegSupport.h"
+#import "Authorization.h"
+#import "PSSharedDictionary.h"
+#import <unistd.h>
+#import <grp.h>
+#import "PingHistory.h"
+#import "AddressScanHistory.h"
+#import "TCPDumpHistory.h"
+#import "TCPFlowHistory.h"
+#import "Apple80211.h"
+
+#import "SentryDocument.h"
+#import "DocumentSupport.h"
+#import "SentryModel.h"
+
+#import "MenuDispatch.h"
+#ifdef IPNetRouter
+#import "DHCPLogger.h"
+#import "RouteWindowC.h"
+#import "NATViewWindowC.h"
+#import "DHCPServerWindowC.h"
+#import "DHCPLogWindowC.h"
+#import "DHCPController.h"
+#import "NameServiceWC.h"
+#import "IPNetClient.h"
+#import "AlternateRouteWC.h"
+#endif
+#import "TrafficDiscoveryWC.h"
+#import "TrafficDiscoveryModel.h"
+#import "DiagnosticWC.h"
+
+#import "BasicSetupWC.h"
+#import "ExpertViewWC.h"
+#import "AirPortConfigurationWindowC.h"		// kAirPortConfiguration_open
+#import "LookupWindowC.h"
+#import "AddressScanWindowC.h"
+#import "SubnetWindowC.h"
+#import "SentryLogWindowC.h"
+#import "TCPDumpWindowC.h"
+#import "SentryLogger.h"
+#import "BandwidthAccounting.h"
+#import "ConnectionLog.h"
+#import "SentryState.h"
+
+#import "unp.h"
+#import "nmCypher.h"
+#import "nmHash.h"
+#import "DemoController.h"
+#import "UpgradeController.h"
+#import "CheckForUpdateC.h"
+#import "RegistrationController.h"
+#import "PSSupport.h"
+#import "ICMPController.h"
+#import "KEVController.h"
+#import "SentryController.h"
+#import "IPNetServer.h"
+#import <fcntl.h>	// for unix open()
+#import <Carbon/Carbon.h>	// GetCurrentKeyModifiers()
+#import <sys/stat.h>		// file permissions
+#import <sys/syslog.h>		// syslog
+#import <ExceptionHandling/NSExceptionHandler.h>
+#import "NSException_Extensions.h"
+
+extern NSString *gStartupAuthContext;
+
+// forward decl
+void signalQuit(int sigParam);
+
+@interface AppDelegate (PrivateMethods)
+- (NSDate *)expireDate;
+- (NSString *)doHash:(NSString *)inStr;
+@end
+
+@implementation AppDelegate
+// ---------------------------------------------------------------------------------
+//	• sharedInstance
+// ---------------------------------------------------------------------------------
++ (AppDelegate *) sharedInstance {
+	static id sharedTask = nil;
+	
+	if(sharedTask==nil) {
+		sharedTask = [NSApp delegate];		// leave as [NSApp delegate]
+		if (sharedTask==nil)
+			sharedTask = [[AppDelegate allocWithZone:[self zone]] init];
+	}
+	return sharedTask;
+}
+
+- init
+{
+    if (self = [super init]) {
+    }
+    return self;
+}
+- (void)dealloc
+{
+	[self setPrefs:nil];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	• applicationDidFinishLaunching
+// ---------------------------------------------------------------------------------
+- (void)applicationDidFinishLaunching:(NSNotification *)aNotification
+{
+	menuDispatch = [MenuDispatch sharedInstance];
+
+	// register signal handler for quit
+	signal(SIGQUIT, &signalQuit);
+	
+	if (gStartupItem) {
+		syslog(LOG_NOTICE, "launched as startup item");
+	}
+	prefs = nil;
+    readPrefsCompleted = NO;
+	authorizationCompleted = NO;
+@try {
+	[regSupport regStartup];
+	
+    // Authorization
+	[self authorizeTools:self];
+    authorizationCompleted = YES;
+
+    // load application Preferences
+	{
+		PingHistory* pingHistory;
+		pingHistory = [PingHistory sharedInstance];
+		[pingHistory restoreWithKey:@"PingHistory"];
+	}
+	{
+		AddressScanHistory* addressScanHistory;
+		addressScanHistory = [AddressScanHistory sharedInstance];
+		[addressScanHistory restoreWithKey:@"AddressScanHistory"];
+	}
+	{
+		TCPDumpHistory* tcpDumpHistory;
+		tcpDumpHistory = [TCPDumpHistory sharedInstance];
+		[tcpDumpHistory restoreWithKey:@"TCPDumpHistory"];
+	}
+	{
+		TCPFlowHistory* tcpFlowHistory;
+		tcpFlowHistory = [TCPFlowHistory sharedInstance];
+		[tcpFlowHistory restoreWithKey:@"TCPFlowHistory"];
+	}
+	[self readPrefs];
+    readPrefsCompleted = YES;
+	// disableCommandQ
+	[[SentryModel sharedInstance] disableCommandQ:[prefs objectForKey:kPreferences_disableCommandQ]];
+
+	// instantiate SentryModel if needed
+	[SentryModel sharedInstance];
+	// connect to NKE
+	[SentryController sharedInstance];
+	// if there's a launched document waiting to be invoked, do it
+	DocumentSupport* launchedDocument;
+	if ((launchedDocument = [[PSSharedDictionary sharedInstance] objectForKey:kInvokeDocumentFirewall])) {
+		[launchedDocument invokeDocumentFirewall];
+	}
+	if ((launchedDocument = [[PSSharedDictionary sharedInstance] objectForKey:kInvokeDocumentRouter])) {
+		[launchedDocument invokeDocumentRouter];
+	}
+	// test if we have opened any document
+	BOOL needDocument = NO;
+	if ([[PSSharedDictionary sharedInstance] objectForKey:kInvokeDocumentDone] == NULL) {
+		needDocument = YES;
+		// remember app is launching without a document
+		[[PSSharedDictionary sharedInstance] setObject:self forKey:kLaunchingWithoutDocument];
+	}
+	
+	// if launched as a startup item, open corresponding settings
+	if (gStartupItem || needDocument) {
+		NSFileManager* fm = [NSFileManager defaultManager];
+		DocumentSupport* documentSupport = [DocumentSupport sharedInstance];
+		NSString* path = [AppSupport appPrefsPath:kSettingsFilename];
+		if (![fm fileExistsAtPath:path]) path = [AppSupport findAlternateFor:kSettingsFilename];
+        // check if file exists
+        if ([fm fileExistsAtPath:path]) {
+			NSLog(@"%@ restoring from %@",PS_PRODUCT_NAME, path);
+			[documentSupport readFromFile:path];
+			[documentSupport restoreState];
+			// allow opening without displaying a document window
+		}
+		else {
+			NSString* str = [NSString stringWithFormat:@"No startup settings found at: %@", path];
+			[self startupItemFail:str];
+		}
+	}
+    // wait for splash timer to continue
+	[regSupport regSplashDown];
+
+	// start ICMP listener from main thread so parent thread doesn't go away
+	BOOL result;
+	result = [[ICMPController sharedInstance] startReceiving];
+	if (!result) NSLog(@"ICMPController startReceiving failed");
+	// start KEV listerner
+	[[KEVController sharedInstance] startReceiving];
+
+	// if not launched by GetURL
+	if (![[PSSharedDictionary sharedInstance] objectForKey:@"GetURL"] && !gStartupItem) {
+		int count, i;
+		BOOL any = NO;
+		// open previously open windows
+		if ((count = [preferences integerForKey:kExpertView_open])) {
+			for (i=0; i<count; i++) [menuDispatch expertViewShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kBasicSetup_open])) {
+			for (i=0; i<count; i++) [menuDispatch basicSetupShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kAirPortConfiguration_open])) {
+			for (i=0; i<count; i++) [menuDispatch airPortConfigurationShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kLookup_open])) {
+			for (i=0; i<count; i++) [menuDispatch lookupShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kAddressScan_open])) {
+			for (i=0; i<count; i++) [menuDispatch addressScanShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kTCPDump_open])) {
+			for (i=0; i<count; i++) [menuDispatch tcpDumpShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kSentryLog_open])) {
+			for (i=0; i<count; i++) [menuDispatch sentryLogShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kSubnet_open])) {
+			for (i=0; i<count; i++) [menuDispatch subnetShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kTrafficDiscovery_open])) {
+			for (i=0; i<count; i++) [menuDispatch trafficDiscoveryShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kDiagnostic_open])) {
+			for (i=0; i<count; i++) [menuDispatch diagnosticShowWindow:self];
+			any = YES;
+		}
+#ifdef IPNetRouter
+		if ((count = [preferences integerForKey:kRoute_open])) {
+			[menuDispatch routeShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kAlternateRoute_open])) {
+			for (i=0; i<count; i++) [menuDispatch alternateRouteShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kNameService_open])) {
+			for (i=0; i<count; i++) [menuDispatch nameServiceShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kNATView_open])) {
+			[menuDispatch natViewShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kDHCPServer_open])) {
+			[menuDispatch dhcpServerShowWindow:self];
+			any = YES;
+		}
+		if ((count = [preferences integerForKey:kDHCPLog_open])) {
+			for (i=0; i<count; i++) [menuDispatch dhcpLogShowWindow:self];
+			any = YES;
+		}
+#endif
+	}
+		
+	// launch IPNetServer server to listen for remote requests
+	//[[IPNetServer sharedInstance] startServing];
+}
+@catch( NSException *theException ) {
+	[theException printStackTrace];
+}
+}	// • applicationDidFinishLaunching
+
+// ---------------------------------------------------------------------------------
+//	• applicationWillTerminate
+// ---------------------------------------------------------------------------------
+- (void)applicationWillTerminate:(NSNotification *)notification {
+@try {
+	// stop IPNetServer server listening for remote requests
+//	[[IPNetServer sharedInstance] stopServing];
+	// disconnect from NKE
+	[[SentryController sharedInstance] terminate];
+//	[NSThread  sleepUntilDate:[NSDate
+//		dateWithTimeIntervalSinceNow:(NSTimeInterval)2.4] ];
+	// Don't stop stand alone DHCP server since another instance might have launched it
+
+	if (readPrefsCompleted & !gStartupItem) {
+		// write out our application preferences
+        {
+            PingHistory* pingHistory;
+            pingHistory = [PingHistory sharedInstance];
+            [pingHistory saveWithKey:@"PingHistory"];
+        }
+        {
+            AddressScanHistory* addressScanHistory;
+            addressScanHistory = [AddressScanHistory sharedInstance];
+            [addressScanHistory saveWithKey:@"AddressScanHistory"];
+        }
+        {
+            TCPDumpHistory* tcpDumpHistory;
+            tcpDumpHistory = [TCPDumpHistory sharedInstance];
+            [tcpDumpHistory saveWithKey:@"TCPDumpHistory"];
+        }
+		{
+            TCPFlowHistory* tcpFlowHistory;
+            tcpFlowHistory = [TCPFlowHistory sharedInstance];
+            [tcpFlowHistory saveWithKey:@"TCPFlowHistory"];
+        }
+        // remember which windows are open
+		#if IPNetRouter
+			[preferences setInteger:[menuDispatch routeCloseAll] forKey:kRoute_open];
+			[preferences setInteger:[menuDispatch alternateRouteCloseAll] forKey:kAlternateRoute_open];
+			[preferences setInteger:[menuDispatch natViewCloseAll] forKey:kNATView_open];
+			[preferences setInteger:[menuDispatch dhcpServerCloseAll] forKey:kDHCPServer_open];
+			[preferences setInteger:[menuDispatch dhcpLogCloseAll] forKey:kDHCPLog_open];
+			[preferences setInteger:[menuDispatch nameServiceCloseAll] forKey:kNameService_open];
+		#endif
+		[preferences setInteger:[menuDispatch trafficDiscoveryCloseAll] forKey:kTrafficDiscovery_open];
+		[preferences setInteger:[menuDispatch diagnosticCloseAll] forKey:kDiagnostic_open];
+		[preferences setInteger:[menuDispatch basicSetupCloseAll] forKey:kBasicSetup_open];
+		[preferences setInteger:[menuDispatch expertViewCloseAll] forKey:kExpertView_open];
+		[preferences setInteger:[menuDispatch airPortConfigurationCloseAll] forKey:kAirPortConfiguration_open];
+		[preferences setInteger:[menuDispatch lookupCloseAll] forKey:kLookup_open];
+		[preferences setInteger:[menuDispatch addressScanCloseAll] forKey:kAddressScan_open];
+		[preferences setInteger:[menuDispatch subnetCloseAll] forKey:kSubnet_open];
+		[preferences setInteger:[menuDispatch sentryLogCloseAll] forKey:kSentryLog_open];
+		[preferences setInteger:[menuDispatch tcpDumpCloseAll] forKey:kTCPDump_open];
+         // synchronize prefs before quitting
+        [self writePrefs];
+    }
+	// write out remaining event log text if any
+	[[SentryLogger sharedInstance] logTextSaveForDate:nil];
+	#ifdef IPNetRouter
+		// write out DHCP log
+		[[DHCPLogger sharedInstance] logTextSaveForDate:nil];
+		// stop DHCP server as needed
+		//	[[DHCPController sharedInstance] dhcpServerOn:0];
+	#endif
+	// write out bandwidth accounting info if any
+	[[BandwidthAccounting sharedInstance] accountingSaveForDate:nil];
+	// write out traffic discovery data
+	[[TrafficDiscoveryModel sharedInstance] trafficDiscoverySaveForDate:nil];
+	// write out connection log info if any
+	[[ConnectionLog sharedInstance] connectionLogSaveForDate:nil];
+	// write out trigger table if any
+	[[DocumentSupport sharedInstance] setSentryState:[[SentryModel sharedInstance] sentryState]];
+	[[DocumentSupport sharedInstance] writeTriggerTable];
+}
+@catch( NSException *theException ) {
+	[theException printStackTrace];
+}
+}	//	• applicationWillTerminate
+
+// ---------------------------------------------------------------------------------
+//	• applicationShouldOpenUntitledFile
+// ---------------------------------------------------------------------------------
+- (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender
+{
+	// don't open an untitled file before app has finished launching
+	if (!authorizationCompleted) return NO;
+	else return YES;
+}
+
+// ---------------------------------------------------------------------------------
+//	• startupItemFail
+// ---------------------------------------------------------------------------------
+// do not allow application to proceed if launched as Mac OS X startup item
+- (void)startupItemFail:(NSString *)reason
+{
+	if (gStartupItem) {
+		syslog(LOG_NOTICE, "%s", [reason UTF8String]);
+		// force program to exit
+		exit(1);
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	• myHelp
+// ---------------------------------------------------------------------------------
+- (IBAction)myHelp:(id)sender
+{
+    openHelpAnchor(@"NMTitle");
+}
+
+// ---------------------------------------------------------------------------------
+//	• readMe
+// ---------------------------------------------------------------------------------
+- (IBAction)readMe:(id)sender
+{
+    NSString *filePath;
+    NSBundle *thisBundle = [NSBundle bundleForClass:[self class]];
+#ifdef IPNetRouter    
+    if ((filePath = [thisBundle pathForResource:@"IPNetRouterX ReadMe" ofType:@"rtf"]))
+        [[NSWorkspace sharedWorkspace] openFile:filePath];
+#else
+    if (filePath = [thisBundle pathForResource:@"IPNetSentryX ReadMe" ofType:@"rtf"])
+        [[NSWorkspace sharedWorkspace] openFile:filePath];
+#endif
+}
+
+// ---------------------------------------------------------------------------------
+//	• license
+// ---------------------------------------------------------------------------------
+- (IBAction)license:(id)sender
+{
+    NSString *filePath;
+    NSBundle *thisBundle = [NSBundle bundleForClass:[self class]];
+    
+    if ((filePath = [thisBundle pathForResource:@"License" ofType:@"rtf"]))
+        [[NSWorkspace sharedWorkspace] openFile:filePath];
+}
+
+// ---------------------------------------------------------------------------------
+//	• releaseNotes
+// ---------------------------------------------------------------------------------
+- (IBAction)releaseNotes:(id)sender
+{
+    NSString *filePath;
+    NSBundle *thisBundle = [NSBundle bundleForClass:[self class]];
+    
+    if ((filePath = [thisBundle pathForResource:@"ReleaseNotes" ofType:@"rtf"]))
+        [[NSWorkspace sharedWorkspace] openFile:filePath];
+}
+
+// ---------------------------------------------------------------------------------
+//	• feedback
+// ---------------------------------------------------------------------------------
+- (IBAction)feedback:(id)sender
+{
+	NSURL *feedbackURL;
+	if ((feedbackURL = [NSURL URLWithString:@"mailto:info@sustworks.com"])) {
+		[[NSWorkspace sharedWorkspace] openURL:feedbackURL];
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	• checkForUpdate
+// ---------------------------------------------------------------------------------
+- (IBAction)checkForUpdate:(id)sender
+{
+    CheckForUpdateC *checkForUpdate;
+    // create window controller and make it the windows owner
+    checkForUpdate = [CheckForUpdateC alloc];
+    checkForUpdate = [checkForUpdate initWithWindowNibName:kCheckForUpdateName owner:checkForUpdate];
+	// restore position and display
+	[[checkForUpdate window] setFrameUsingName:kCheckForUpdateName];
+	[checkForUpdate showWindow:sender];
+	[checkForUpdate autorelease];
+}
+
+
+#pragma mark --- read/write prefs ---
+// ---------------------------------------------------------------------------
+//	• prefs
+// ---------------------------------------------------------------------------
+- (NSMutableDictionary*)prefs
+{
+	if (prefs == nil) [self readPrefs];
+	return prefs;
+}
+- (void)setPrefs:(NSMutableDictionary*)value;
+{
+	[value retain];
+	[prefs release];
+	prefs = value;
+}
+
+// ---------------------------------------------------------------------------
+//	• readPrefs
+// ---------------------------------------------------------------------------
+// read common system wide application prefs
+- (BOOL)readPrefs
+{
+	BOOL returnValue = NO;
+	NSString* path;
+	NSMutableDictionary* dataDictionary;
+
+	NS_DURING
+		//path = [AppSupport appPrefsPath:kPrefsFilename];
+		path = [AppSupport appPrefsFile];
+		dataDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:path];
+		if (dataDictionary == nil) {
+			path = [AppSupport findAlternateFor:kPrefsFilename];
+			dataDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:path];
+		}
+		if (dataDictionary == nil) dataDictionary = [NSMutableDictionary dictionaryWithCapacity:30];
+		[self setPrefs:dataDictionary];
+		returnValue = YES;
+	NS_HANDLER
+		NSLog(@"Exception while reading application preferences");
+	NS_ENDHANDLER
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//	• writePrefs
+// ---------------------------------------------------------------------------
+// write common system wide application prefs
+- (BOOL)writePrefs
+{
+	BOOL returnValue;
+	NSString* path;
+
+	path = [AppSupport appPrefsFile];
+	returnValue = [prefs writeToFile:path atomically:YES];
+	if (returnValue != YES) NSLog(@"Error while writing application preferences");
+	return returnValue;
+}
+
+
+#pragma mark --- Authorization ---
+// ---------------------------------------------------------------------------------
+//	• authorizationCompleted
+// ---------------------------------------------------------------------------------
+- (BOOL)authorizationCompleted
+{
+	return authorizationCompleted;
+}
+
+// ---------------------------------------------------------------------------------
+//	• unloadNKE
+// ---------------------------------------------------------------------------------
+// check with user and try to unload our NKE
+- (IBAction)unloadNKE:(id)sender
+{
+    int answer;
+
+	// warn user
+	answer = NSRunAlertPanel([NSString stringWithFormat:@"%@ Unload NKE",PS_PRODUCT_NAME],
+		@"Use this feature to unload the Network Kernel Extension so you can load a new version without restarting. You must stop all software that uses the NKE before it will unload.",
+		@"OK",
+		@"Cancel",
+		nil);
+	if (answer == NSAlertDefaultReturn) {
+		// terminate connection to NKE
+		[[SentryController sharedInstance] terminate];
+		// make sure server has time to fully stop
+		[NSThread  sleepUntilDate:[NSDate
+            dateWithTimeIntervalSinceNow:(NSTimeInterval)2.5]];
+		[self doUnloadNKE];
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	• doUnloadNKE
+// ---------------------------------------------------------------------------------
+// try to unload our NKE
+- (int)doUnloadNKE
+{
+    int returnValue = 0;
+	BOOL fileExists;
+	NSString* toolPath;
+    NSString* nkePath;
+
+    do {
+        // get tool path
+        toolPath = [AppSupport toolPathForName:@"LoadNKE" fileExists:&fileExists];
+		if (!fileExists) {
+			NSLog(@"Helper tool LoadNKE not found at path: %@",toolPath);
+			returnValue = -1;
+			break;
+		}
+        // get NKE path
+        nkePath = [AppSupport toolPathForName:ps_kext_name fileExists:&fileExists];
+		if (!fileExists) {
+			NSLog(@"NKE was not found at path: %@",nkePath);
+			returnValue = -1;
+			break;
+		}
+        // run tool to unload our NKE
+        returnValue = [AppSupport doTask:toolPath
+            arguments:[NSArray arrayWithObjects:@"-unload", nkePath, nil] output:nil];
+    } while (false);
+	if (returnValue == 0) {
+		[[[SentryModel sharedInstance] sentryState] updateParameter:@"statusInfo"
+			withObject:@"Success, NKE unloaded"];
+		NSLog(@"Success, NKE unloaded");
+	}
+	else {
+		[[[SentryModel sharedInstance] sentryState] updateParameter:@"statusInfo"
+			withObject:@"No previous NKE or failed to unload"];
+		NSLog(@"No previous NKE or failed to unload");
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	• authorizeTools
+// ---------------------------------------------------------------------------------
+// check our suid root tools and authorize as needed
+- (int)authorizeTools:(id)sender
+{
+	int result = 0;
+    BOOL didAuthorize = NO;
+	int authResult = 0;
+	NSFileManager* fm = [NSFileManager defaultManager];
+	BOOL status;
+	NSString* path;
+	BOOL fileExists;
+	// authorization lists
+	NSMutableArray* authorizeList = nil;
+	NSMutableArray* adminAuthorizeList = nil;
+	NSMutableArray* kextAuthorizeList = nil;
+	NSMutableArray* startupAuthorizeList = nil;
+    do {
+		NSString* resourcePath;
+		NSString* dest;
+        // check that our Authorization tool is present in bundle and confirm identify
+		path = [AppSupport bundleToolPath:@"Authorize"];
+        result = [AppSupport checkToolAuthorization:path];
+        if (result != 181) {
+			NSLog(@"Authorization tool not found or invalid.");
+			break;
+		}
+		// build lists of paths to authorize
+		// ---------------------------------
+
+			// Autorize privileged Tools
+        authorizeList = [[NSMutableArray alloc] init];
+        // check our OpenICMP tool
+        result = [AppSupport checkTool:@"OpenICMP"];
+        if (result == 181) {
+            path = [AppSupport toolPathForName:@"OpenICMP" fileExists:&fileExists];
+            if (fileExists) [authorizeList addObject:path];
+        }
+        // check our LoadNKE tool
+        result = [AppSupport checkTool:@"LoadNKE"];
+        if (result == 181) {
+            path = [AppSupport toolPathForName:@"LoadNKE" fileExists:&fileExists];
+            if (fileExists) [authorizeList addObject:path];
+        }
+#ifdef IPNetRouter
+        // check our ConfigSysctl tool
+        result = [AppSupport checkTool:@"ConfigSysctl"];
+        if (result == 181) {
+            path = [AppSupport toolPathForName:@"ConfigSysctl" fileExists:&fileExists];
+            if (fileExists) [authorizeList addObject:path];
+        }
+        // check our RunNamed tool
+        result = [AppSupport checkTool:@"RunNamed"];
+        if (result == 181) {
+            path = [AppSupport toolPathForName:@"RunNamed" fileExists:&fileExists];
+            if (fileExists) [authorizeList addObject:path];
+        }
+			// copy over DHCPServer_app
+		resourcePath = [AppSupport bundleToolPath:@"DHCPServer_app"];
+		result = [AppSupport getHelperToolFromPath:resourcePath outPath:&path];
+		if (result < 0) [Authorization reinstall:@"DHCPServer_app"];
+		// confirm signature
+		result = [AppSupport validateSignedCodeAtPath:path];
+#endif
+
+		// Don't attempt admin authorizations if current user is not in admin group
+			// get group ID of admin group
+		BOOL isAdminUser = NO;
+		gid_t admin_gid = 0;
+		struct group *record;
+		record = getgrnam("admin");
+        if (record) admin_gid = record->gr_gid;
+			// get supplimentary groups
+		gid_t groupList[NGROUPS_MAX];
+		int groupCount = getgroups(NGROUPS_MAX, groupList);
+			// test if user is a member of the admin group
+		int i;
+		for (i=0; i<groupCount; i++) {
+			if (admin_gid == groupList[i]) {
+				isAdminUser = YES;
+				break;
+			}
+		}		
+			// admin authorize
+		adminAuthorizeList = [[NSMutableArray alloc] init];
+		if (isAdminUser) {
+			// check our RunTCPDump tool
+			result = [AppSupport checkTool:@"RunTCPDump"];
+			if (result == 181) {
+				path = [AppSupport toolPathForName:@"RunTCPDump" fileExists:&fileExists];
+				if (fileExists) [adminAuthorizeList addObject:path];
+			}
+			// check our RunTCPFlow tool
+			result = [AppSupport checkTool:@"RunTCPFlow"];
+			if (result == 181) {
+				path = [AppSupport toolPathForName:@"RunTCPFlow" fileExists:&fileExists];
+				if (fileExists) [adminAuthorizeList addObject:path];
+			}
+			// check our RunRoute tool
+			result = [AppSupport checkTool:@"RunRoute"];
+			if (result == 181) {
+				path = [AppSupport toolPathForName:@"RunRoute" fileExists:&fileExists];
+				if (fileExists) [adminAuthorizeList addObject:path];
+			}
+				// copy over tcpflow.intel and tcpflow.ppc
+			resourcePath = [AppSupport bundleToolPath:@"tcpflow.intel"];
+			result = [AppSupport getHelperToolFromPath:resourcePath outPath:&path];
+			if (result < 0) [Authorization reinstall:@"tcpflow.intel"];
+			resourcePath = [AppSupport bundleToolPath:@"tcpflow.ppc"];
+			result = [AppSupport getHelperToolFromPath:resourcePath outPath:&path];
+			if (result < 0) [Authorization reinstall:@"tcpflow.ppc"];
+		}
+		
+			// kext authorize
+		kextAuthorizeList = [[NSMutableArray alloc] init];
+		// check our NKE
+        result = [AppSupport checkNKE:ps_kext_name];
+        if ((result == 181) || didAuthorize) {
+            int retry = 3;
+			path = [AppSupport toolPathForName:ps_kext_name fileExists:&fileExists];
+			while (!fileExists && (retry > 0)) {
+				// pause and try again
+				retry -= 1;
+				[NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.2] ];
+				path = [AppSupport toolPathForName:ps_kext_name fileExists:&fileExists];
+			}
+            if (fileExists) {
+                // also need to authorize files inside kext bundle
+				if (0) {
+					NSDirectoryEnumerator* en = [fm enumeratorAtPath:path];
+					NSString* file;
+					while (file = [en nextObject]) {
+						[kextAuthorizeList addObject:[path stringByAppendingPathComponent:file]];
+					}
+ 				}
+                [kextAuthorizeList addObject:path];
+            }
+            else {
+            	NSBeep();
+            	NSLog(@"Could not find path for resource %@",ps_kext_name);
+            }
+        }
+
+			// authorize startupItem files
+		startupAuthorizeList = [[NSMutableArray alloc] init];
+		if (!gStartupItem) {
+			resourcePath = [[NSBundle mainBundle] pathForResource:PS_STARTUP_ITEM_NAME ofType:nil];
+			result = [AppSupport getHelperToolFromPath:resourcePath outPath:&path];
+			//if ((result > 0) && didAuthorize) {
+			if (result > 0) {
+				NSString* dest = [AppSupport toolPathForName:PS_STARTUP_ITEM_NAME fileExists:&fileExists];
+				// startup item bundle
+				[startupAuthorizeList addObject:dest];
+				// bundle/IPNetX_startup
+				[startupAuthorizeList addObject:[dest stringByAppendingPathComponent:PS_STARTUP_ITEM_NAME]];
+				// bundle/StartupParameters.plist
+				[startupAuthorizeList addObject:[dest stringByAppendingPathComponent:@"StartupParameters.plist"]];
+
+				// replace <filepath> in startup script
+				NSString* startupItemPath = [path stringByAppendingPathComponent:PS_STARTUP_ITEM_NAME];
+				NSData* data = [NSData dataWithContentsOfFile:startupItemPath];
+				NSString* content = [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+				NSRange range = [content rangeOfString:@"<filepath>"];
+				if (range.length) {
+					resourcePath = [[NSBundle mainBundle] executablePath];
+					// escape any space characters to use in script
+					NSMutableString* rp;
+					rp = [NSMutableString stringWithString:resourcePath];
+					[rp replaceOccurrencesOfString:@" " withString:@"\\ " options:0 range:NSMakeRange(0, [rp length])];
+					resourcePath = (NSString *)rp;
+					NSString* contentB = [NSString stringWithFormat:@"%@%@%@",
+						[content substringToIndex:range.location],
+						resourcePath,
+						[content substringFromIndex:(range.location+range.length)]];
+					data = [contentB dataUsingEncoding:NSUTF8StringEncoding];
+					[data writeToFile:startupItemPath atomically:NO];
+				}
+
+				// StartupItems directory (as needed)
+				path = @"/Library/StartupItems";
+				if (![fm fileExistsAtPath:path]) {
+					status = [fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
+					if (status) [startupAuthorizeList addObject:path];
+				}
+				[self startupItemFail:@"Startup item not yet authorized"];
+			}
+		}
+
+		// Do authorizations from lists
+		// ----------------------------
+		// need to ensure file system has stabilized
+		sync();
+		if ([kextAuthorizeList count]) {
+			BOOL keepWaiting;
+			int count = 0;
+			do {
+				keepWaiting = NO;
+				count += 1;
+				NSEnumerator* en = [kextAuthorizeList objectEnumerator];
+				while (path = [en nextObject]) {
+					if (![fm fileExistsAtPath:path]) {
+						keepWaiting = YES;
+						[NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.1] ];
+						break;
+					}
+				}
+			} while (keepWaiting && (count < 20));
+		}
+        // authorize tools as needed
+        if ([authorizeList count]) {
+			[self startupItemFail:@"Tools not yet authorized"];
+			if ([[Authorization sharedInstance] doAuthorization:gStartupAuthContext]) {
+                authResult = [[Authorization sharedInstance] authorize:authorizeList withCommand:@"-authorize"];
+				if (authResult == 0) didAuthorize = YES;
+				else {
+					NSLog(@"SUID authorization failed.");
+					break;
+				}
+            }
+			else {
+				NSLog(@"SUID authentication failed or was cancelled.");
+				break;
+			}
+        }
+        // adminauthorize tools as needed
+        if ([adminAuthorizeList count]) {
+            [self startupItemFail:@"Tools not yet authorized"];
+			if ([[Authorization sharedInstance] doAuthorization:gStartupAuthContext]) {
+                authResult = [[Authorization sharedInstance] authorize:adminAuthorizeList withCommand:@"-adminauthorize"];
+				if (authResult == 0) didAuthorize = YES;
+				else {
+					NSLog(@"Admin authorization failed.");
+					break;
+				}
+            }
+			else {
+				NSLog(@"Admin authentication failed or was cancelled.");
+				break;
+			}
+        }       
+        // kextauthorize NKE as needed
+        if ([kextAuthorizeList count]) {
+            [self startupItemFail:@"NKE not yet authorized"];
+			if ([[Authorization sharedInstance] doAuthorization:gStartupAuthContext]) {
+                authResult = [[Authorization sharedInstance] authorize:kextAuthorizeList withCommand:@"-kextauthorize"];
+				if (authResult == 0) didAuthorize = YES;
+				else {
+					NSLog(@"Kext authorization failed.");
+					break;
+				}
+            }
+			else {
+				NSLog(@"Kext authentication failed or was cancelled.");
+				break;
+			}
+        }
+		// startupauthorize startup item (root:admin) as needed
+		if ([startupAuthorizeList count]) {
+			if ([[Authorization sharedInstance] doAuthorization:gStartupAuthContext]) {
+				authResult = [[Authorization sharedInstance] authorize:startupAuthorizeList withCommand:@"-startupauthorize"];
+				if (authResult == 0) didAuthorize = YES;
+				else {
+					NSLog(@"StartupItem authorization failed.");
+					break;
+				}
+			}
+			else {
+				NSLog(@"StartupItem authentication failed or was cancelled.");
+				break;
+			}
+		}
+        
+        // authorization complete
+        // -----------------------
+		sync();
+		int totalCount = [authorizeList count] + [adminAuthorizeList count] + 
+			[kextAuthorizeList count] + [startupAuthorizeList count];
+		if (totalCount) {
+			// replace previous HelperToolVersion.plist to indicate what versions we installed
+			resourcePath = [[NSBundle mainBundle] pathForResource:kHelperToolsVersion ofType:@"plist"];
+			dest = [AppSupport helperToolPath:kHelperToolsVersionPlist];
+			[AppSupport copyPath:resourcePath toPath:dest];	
+		}
+		// Confirm code signature for entire app
+		[AppSupport validateSignedCodeAtPath:[[NSBundle mainBundle] bundlePath]];
+		if (didAuthorize) {
+			// try to unload NKE since user might have installed a new version
+			[self doUnloadNKE];
+		}
+	} while (false);
+	// release our lists
+	[authorizeList release];
+	[adminAuthorizeList release];
+	[kextAuthorizeList release];
+	[startupAuthorizeList release];
+	// authorization finish
+	[[Authorization sharedInstance] deauthenticate];
+	if (authResult && !didAuthorize) {
+		NSLog(@"Authorization result: %d", authResult);
+		[[Authorization sharedInstance] authorizationNotCompleted];
+	}
+	return result;
+}
+
+#pragma mark -- Save and Restore Documents --
+
+// ---------------------------------------------------------------------------
+//	• saveDocument
+// ---------------------------------------------------------------------------
+// allow saving settings directly from other windows
+- (IBAction)saveDocument:(id)sender
+{
+	SentryDocument* theDocument;
+	NSArray* list;
+	NSDocumentController* dc = [NSDocumentController sharedDocumentController];
+
+	list = [dc documents];
+	if ([list count]) {
+		theDocument = [list objectAtIndex:0];
+		[theDocument saveDocument:sender];
+	}
+	else {
+		// transfer application state to save dictionary
+		[[DocumentSupport sharedInstance] saveState];
+		// save to disk
+ 		NSString* path = [AppSupport appPrefsPath:kSettingsFilename];
+		[[DocumentSupport sharedInstance] writeToFile:path];
+    }
+}
+
+// ---------------------------------------------------------------------------
+//	• saveDocumentAs
+// ---------------------------------------------------------------------------
+// allow saving settings directly from other windows
+- (IBAction)saveDocumentAs:(id)sender
+{
+	SentryDocument* theDocument;
+	NSArray* list;
+	NSDocumentController* dc = [NSDocumentController sharedDocumentController];
+
+	list = [dc documents];
+	if ([list count]) {
+		theDocument = [list objectAtIndex:0];
+		[theDocument saveDocumentAs:sender];
+	}
+	else {
+		[dc newDocument:sender];
+		theDocument = [dc currentDocument];
+		[theDocument loadActive];
+		// tell document where our settings came from
+		NSString* path = [AppSupport appPrefsPath:kSettingsFilename];
+		[theDocument setFileURL:[NSURL URLWithString:path]];
+		#ifdef IPNetRouter
+			[theDocument setFileType:@"ipnr"];
+		#else
+			[theDocument setFileType:@"nsy"];
+		#endif
+		[theDocument saveDocumentAs:sender];
+    }
+}
+
+// ---------------------------------------------------------------------------
+//	• revertDocumentToSaved
+// ---------------------------------------------------------------------------
+- (IBAction)revertDocumentToSaved:(id)sender
+{
+	SentryDocument* theDocument;
+	NSArray* list;
+	NSDocumentController* dc = [NSDocumentController sharedDocumentController];
+
+	list = [dc documents];
+	if ([list count]) {
+		theDocument = [list objectAtIndex:0];
+		[theDocument revertDocumentToSaved:sender];
+	}
+	else {
+		NSString* path = [AppSupport appPrefsPath:kSettingsFilename];        
+        [dc openDocumentWithContentsOfURL:[NSURL URLWithString:path] display:YES completionHandler:^(NSDocument *document, BOOL documentWasAlreadyOpen, NSError *error) {
+            [document revertDocumentToSaved:nil];
+        }];
+    }
+}
+
+@end
+
+// signal handler to quit application normally
+void signalQuit(int sig)
+{
+	syslog(LOG_NOTICE, "application shutdown in response to SIGQUIT");
+	[NSApp terminate:nil];
+}

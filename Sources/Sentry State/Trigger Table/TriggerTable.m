@@ -1,0 +1,294 @@
+//  TriggerTable.m
+//  IPNetSentryX
+//
+//  Created by Peter Sichel on Thu May 16 2003.
+//  Copyright (c) 2003 Sustainable Softworks, Inc. All rights reserved.
+//
+//	Delegate and data source for interface table
+
+#import "TriggerTable.h"
+#import "SentryDocument.h"
+#import "SentryState.h"
+#import "IPTypes.h"
+#import PS_TNKE_INCLUDE
+#import "kft.h"
+#import "kftTrigger.h"
+
+
+// forward internal function declarations
+int triggerAddressFree (void * key);
+int triggerAddressCompare (void * compare_arg, void * a, void * b);
+
+@implementation TriggerTable
+
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+	if (self = [super init]) {
+        // initialize our instance variables
+		KFT_avlExternalType(1);
+		triggerAddressTree = new_avl_tree (triggerAddressCompare, NULL);
+		KFT_avlExternalType(0);
+		delegate = nil;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ dealloc
+// ---------------------------------------------------------------------------------
+- (void) dealloc {
+    if (triggerAddressTree) free_avl_tree(triggerAddressTree, triggerAddressFree);
+	[self setDelegate:nil];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+// ¥ delegate
+// ---------------------------------------------------------------------------------
+- (id)delegate { return delegate; }
+- (void)setDelegate:(id)value {
+	//[value retain];
+	//[delegate release];
+	delegate = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ triggerArray
+// ---------------------------------------------------------------------------------
+- (NSMutableArray *)triggerArray {
+	NSMutableArray* triggerArray = nil;
+	TriggerEntry* entry;
+	int count, i;
+	int result;
+	
+	do {
+		if (triggerAddressTree) count = triggerAddressTree->length;
+		else break;
+		triggerArray = [NSMutableArray array];
+		for (i=0; i<count; i++) {
+			result = get_item_by_index(triggerAddressTree, i, (void **)&entry);
+			if (!result) [triggerArray addObject:entry];
+		}
+	} while (false);
+	return (NSMutableArray *)triggerArray;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ arrayOfDictionaries
+// ---------------------------------------------------------------------------------
+- (NSArray *)arrayOfDictionaries {
+	NSMutableArray* arrayOfDictionaries = nil;
+	TriggerEntry* entry;
+	int count, i;
+	int result;
+	
+	do {
+		if (triggerAddressTree) count = triggerAddressTree->length;
+		else break;
+		arrayOfDictionaries = [NSMutableArray array];
+		for (i=0; i<count; i++) {
+			result = get_item_by_index(triggerAddressTree, i, (void **)&entry);
+			if (!result) [arrayOfDictionaries addObject:[entry nodeDictionary]];
+		}
+	} while (false);
+	return (NSArray *)arrayOfDictionaries;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ loadArrayOfDictionaries
+// ---------------------------------------------------------------------------------
+- (BOOL)loadArrayOfDictionaries:(NSArray *)inArray
+{
+	int returnValue = YES;
+	NSEnumerator* en;
+	NSDictionary* nodeDictionary;
+	TriggerEntry* entry;
+	
+	en = [inArray objectEnumerator];
+	while (nodeDictionary = [en nextObject]) {
+		entry = [TriggerEntry entryFromDictionary:nodeDictionary];
+		if (entry) [self insertObject:entry];
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ objectForKey
+// ---------------------------------------------------------------------------------
+//	return matching entry if any, or nil
+- (TriggerEntry *)objectForKey:(TriggerEntry *)value
+{
+	TriggerEntry* returnValue = nil;
+	if (triggerAddressTree) {
+		// don't allow multiple keys with same value
+		get_item_by_key(triggerAddressTree, (void *)value, (void **)&returnValue);
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ insertObject
+// ---------------------------------------------------------------------------------
+//	0=success, -1=failure
+- (int)insertObject:(TriggerEntry *)value
+{
+	int returnValue = -1;
+	TriggerEntry* entry;
+	KFT_avlExternalType(1);
+	if (triggerAddressTree) {
+		// don't allow multiple keys with same value
+		returnValue = get_item_by_key(triggerAddressTree, (void *)value, (void **)&entry);
+		if (returnValue == 0) {
+			// found a match (address & type) update others
+			[entry setLastTime:[value lastTime]];
+			[entry setDuration:[value duration]];
+			[entry setTriggeredBy:[value triggeredBy]];
+			[entry setMatchCount:[value matchCount]];
+		}
+		else {
+			returnValue = insert_by_key(triggerAddressTree, (void *)value);
+			if (returnValue == 0) [value retain];
+		}
+	}
+	KFT_avlExternalType(0);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeObject
+// ---------------------------------------------------------------------------------
+// return -1 if no matching object found
+- (int)removeObject:(TriggerEntry *)value
+{
+	int returnValue = -1;
+	TriggerEntry* foundEntry = nil;
+	
+	KFT_avlExternalType(1);
+	if (triggerAddressTree && value) {
+		// look for matching entry to delete
+		returnValue = get_item_by_key(triggerAddressTree, (void *)value, (void **)&foundEntry);
+		if (returnValue == 0) {
+			returnValue = remove_by_key(triggerAddressTree, (void *)foundEntry, triggerAddressFree);
+		}
+	}
+	KFT_avlExternalType(0);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeAllObjects
+// ---------------------------------------------------------------------------------
+- (int)removeAllObjects
+{
+	int returnValue = 0;
+	KFT_avlExternalType(1);
+	if (triggerAddressTree) {
+		free_avl_tree(triggerAddressTree, triggerAddressFree);
+		triggerAddressTree = new_avl_tree(triggerAddressCompare, NULL);
+		if (!triggerAddressTree) returnValue = -1;
+	}
+	KFT_avlExternalType(0);
+	return returnValue;
+}
+
+- (TriggerEntry *)objectAtIndex:(int)row
+{
+	id object = nil;
+	TriggerEntry* entry;
+	int result;
+	result = get_item_by_index(triggerAddressTree, row, (void **)&entry);
+	if (result == 0) object = entry;
+	return object;
+}
+
+- (unsigned)count
+{
+	if (triggerAddressTree) return triggerAddressTree->length;
+	else return 0;
+}
+
+
+#pragma mark --- NSTableViewDelegate ---
+//- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldEditTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)selectionShouldChangeInTableView:(NSTableView *)aTableView;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectTableColumn:(NSTableColumn *)tableColumn;
+
+#pragma mark --- NSTableDataSource ---
+- (int)numberOfRowsInTableView:(NSTableView *)tableView
+{
+	if (triggerAddressTree) return triggerAddressTree->length;
+	else return 0;
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	id object = nil;
+	TriggerEntry* entry;
+	int result;
+	result = get_item_by_index(triggerAddressTree, row, (void **)&entry);
+	if (result == 0) {
+		NSString* cid = [tableColumn identifier];
+		object = [entry valueForKey:cid];
+		if ([cid isEqualTo:@"lastTime"]) {
+			object = [(NSDate *)object descriptionWithCalendarFormat:@"%Y-%m-%d %H:%M:%S" timeZone:nil locale:nil];
+		}
+	}
+	return object;
+}
+
+// optional
+- (void)tableView:(NSTableView *)tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	TriggerEntry* entry;
+	int result;
+	result = get_item_by_index(triggerAddressTree, row, (void **)&entry);
+	if (result == 0) {
+			// remove in case key changes
+			[entry retain];
+			[self removeObject:entry];
+		NSString* cid = [tableColumn identifier];
+		[entry setValue:object forKey:cid];
+			// reinsert after updating value
+			[self insertObject:entry];
+			[entry release];
+		[delegate updateParameter:SS_documentChangeDone withObject:[NSNumber numberWithInt:NSChangeDone]];
+		[delegate setApplyPending:[NSNumber numberWithInt:1]];
+		[tableView reloadData];
+	}
+}
+
+@end
+
+// ---------------------------------------------------------------------------------
+//	¥ triggerAddressFree()
+// ---------------------------------------------------------------------------------
+// used as avl_free_key_fun_type
+int triggerAddressFree (void * key) {
+  TriggerEntry *entry;
+  entry = (TriggerEntry *)key;
+  [entry release];
+  return 0;
+}
+
+
+
+// ---------------------------------------------------------------------------------
+//	¥ triggerAddressCompare()
+// ---------------------------------------------------------------------------------
+// used as avl_key_compare_fun_type
+int triggerAddressCompare (void * compare_arg, void * a, void * b)
+{
+  TriggerEntry *ta;
+  TriggerEntry *tb;
+  ta = (TriggerEntry *)a;
+  tb = (TriggerEntry *)b;
+  
+  return [ta compare:tb];
+}
+
+

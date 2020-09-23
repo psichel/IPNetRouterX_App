@@ -1,0 +1,16 @@
+;-----------------------------------------------------------------------------
+; lan.rev - used to define reverse name resolution for hosts on your local LAN.
+;-----------------------------------------------------------------------------
+$TTL	86400
+$ORIGIN 0.168.192.in-addr.arpa.			;IPNR_origin;
+@  IN SOA  gateway.lan. root.lan.  (				 ;IPNR_SOA;
+				   2006092900	;IPNR_serial; YYYYMMDDxx
+                   3600			; Refresh
+                   300			; Retry
+                   3600000		; Expire
+                   3600 )		; Minimum
+
+                   IN NS   gateway.lan.     ;IPNR_NS;
+1                  IN PTR  gateway.lan.     ;IPNR_PTR;
+2                  IN PTR  myhostname.lan.	;IPNR_PTR; Reverse dns for host on your LAN
+;IPNR_PTR; PTR record place-holder (define reverse DNS for hosts on your LAN)

@@ -1,0 +1,270 @@
+//  NatTable.m
+//  IPNetSentryX
+//
+//  Created by Peter Sichel on Thu May 16 2003.
+//  Copyright (c) 2003 Sustainable Softworks, Inc. All rights reserved.
+//
+//	Delegate and data source for interface table
+
+#import "NatTable.h"
+#import "IPTypes.h"
+#import PS_TNKE_INCLUDE
+#import "kft.h"
+
+
+// forward internal function declarations
+int natApparentFree (void * key);
+int natApparentCompare (void * compare_arg, void * a, void * b);
+
+@implementation NatTable
+
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+	if (self = [super init]) {
+        // initialize our instance variables
+		KFT_avlExternalType(1);
+		natApparentTree = new_avl_tree (natApparentCompare, NULL);
+		KFT_avlExternalType(0);
+		delegate = nil;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ dealloc
+// ---------------------------------------------------------------------------------
+- (void) dealloc {
+    if (natApparentTree) free_avl_tree(natApparentTree, natApparentFree);
+	[self setDelegate:nil];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+// ¥ delegate
+// ---------------------------------------------------------------------------------
+- (id)delegate { return delegate; }
+- (void)setDelegate:(id)value {
+	//[value retain];
+	//[delegate release];
+	delegate = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ arrayOfDictionaries
+// ---------------------------------------------------------------------------------
+- (NSArray *)arrayOfDictionaries {
+	NSMutableArray* arrayOfDictionaries = nil;
+	NatEntry* entry;
+	int count, i;
+	int result;
+	
+	do {
+		if (natApparentTree) count = natApparentTree->length;
+		else break;
+		arrayOfDictionaries = [NSMutableArray array];
+		for (i=0; i<count; i++) {
+			result = get_item_by_index(natApparentTree, i, (void **)&entry);
+			if (!result) [arrayOfDictionaries addObject:[entry nodeDictionary]];
+		}
+	} while (false);
+	return (NSArray *)arrayOfDictionaries;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ loadArrayOfDictionaries
+// ---------------------------------------------------------------------------------
+- (BOOL)loadArrayOfDictionaries:(NSDictionary *)inArray
+{
+	int returnValue = YES;
+	NSEnumerator* en;
+	NSDictionary* nodeDictionary;
+	NatEntry* entry;
+	
+	en = [inArray objectEnumerator];
+	while (nodeDictionary = [en nextObject]) {
+		entry = [NatEntry entryFromDictionary:nodeDictionary];
+		if (entry) [self insertObject:entry];
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ insertObject
+// ---------------------------------------------------------------------------------
+//	0=success, 1=duplicate found, -1=failure
+- (int)insertObject:(NatEntry *)value
+{
+	int returnValue = -1;
+	NatEntry* entry;
+	KFT_avlExternalType(1);
+	if (natApparentTree && value) {
+		// don't allow multiple keys with same value
+		returnValue = get_item_by_key(natApparentTree, (void *)value, (void **)&entry);
+		if (returnValue == 0) {
+			// found a match update rest of entry
+			[entry setActualPort:[value actualPort]];
+			[entry setActualAddress:[value actualAddress]];
+			[entry setLastTime:[value lastTime]];
+			[entry setFlags:[value flags]];
+			returnValue = 1;
+		}
+		else {
+			returnValue = insert_by_key(natApparentTree, (void *)value);
+			if (returnValue == 0) [value retain];
+		}
+	}
+	KFT_avlExternalType(0);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeObject
+// ---------------------------------------------------------------------------------
+// return -1 if no matching object found
+- (int)removeObject:(NatEntry *)value
+{
+	int returnValue = -1;
+	NatEntry* foundEntry = nil;
+	
+	KFT_avlExternalType(1);
+	if (natApparentTree && value) {
+		// look for matching entry to delete
+		returnValue = get_item_by_key(natApparentTree, (void *)value, (void **)&foundEntry);
+		if (returnValue == 0) {
+			returnValue = remove_by_key(natApparentTree, (void *)foundEntry, natApparentFree);
+		}
+	}
+	KFT_avlExternalType(0);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ removeAllObjects
+// ---------------------------------------------------------------------------------
+- (int)removeAllObjects
+{
+	int returnValue = 0;
+	if (natApparentTree) {
+		KFT_avlExternalType(1);
+		free_avl_tree(natApparentTree, natApparentFree);
+		natApparentTree = new_avl_tree(natApparentCompare, NULL);
+		KFT_avlExternalType(0);
+		if (!natApparentTree) return -1;
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ objectAtIndex
+// ---------------------------------------------------------------------------------
+- (NatEntry *)objectAtIndex:(int)row
+{
+	id object = nil;
+	NatEntry* entry;
+	int result;
+	result = get_item_by_index(natApparentTree, row, (void **)&entry);
+	if (result == 0) object = entry;
+	return object;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ count
+// ---------------------------------------------------------------------------------
+- (unsigned)count
+{
+	if (natApparentTree) return natApparentTree->length;
+	else return 0;
+}
+
+#pragma mark --- NSTableViewDelegate ---
+//- (void)tableView:(NSTableView *)tableView willDisplayCell:(id)cell forTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldEditTableColumn:(NSTableColumn *)tableColumn row:(int)row;
+//- (BOOL)selectionShouldChangeInTableView:(NSTableView *)aTableView;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(int)row;
+//- (BOOL)tableView:(NSTableView *)tableView shouldSelectTableColumn:(NSTableColumn *)tableColumn;
+
+#pragma mark --- NSTableDataSource ---
+- (int)numberOfRowsInTableView:(NSTableView *)tableView
+{
+	if (natApparentTree) return natApparentTree->length;
+	else return 0;
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	id object = nil;
+	NatEntry* entry;
+	int result;
+	result = get_item_by_index(natApparentTree, row, (void **)&entry);
+	if (result == 0) {
+		object = [entry valueForKey:[tableColumn identifier]];
+//		if ([[tableColumn identifier] isEqualTo:PM_apparentPort])
+//			NSLog(@"Row %d, entry %@", row, [entry description]);
+	}
+	else NSBeep();
+	return object;
+}
+/*
+// optional
+- (void)tableView:(NSTableView *)tableView setObjectValue:(id)object forTableColumn:(NSTableColumn *)tableColumn row:(int)row
+{
+	NatEntry* entry;
+	NSString* cid;	// column identifier
+	NSString* oldValue;
+	int result;
+	result = get_item_by_index(natApparentTree, row, (void **)&entry);
+	if (result == 0) {
+		// test if value has changed
+		cid = [tableColumn identifier];
+		oldValue = [entry valueForKey:cid];
+		if (![oldValue isEqualTo:object]) {
+			// test for apparent endpoint
+			if ([cid isEqualTo:PM_apparentAddress] ||
+				[cid isEqualTo:PM_apparentPort] ||
+				[cid isEqualTo:PM_protocol]) {						
+				[[entry retain] autorelease];
+				[self removeObject:entry];
+				[entry setValue:object forKey:cid];
+				[self insertObject:entry];
+				[tableView reloadData];
+			}
+			else [entry setValue:object forKey:cid];
+			// notify listeners
+			[delegate updateParameter:SS_documentChangeDone withObject:[NSNumber numberWithInt:NSChangeDone]];
+		}	// if (![oldValue isEqualTo:object])
+	}	// if (result == 0)
+}
+*/
+@end
+
+// ---------------------------------------------------------------------------------
+//	¥ natApparentFree()
+// ---------------------------------------------------------------------------------
+// used as avl_free_key_fun_type
+int natApparentFree (void * key) {
+  NatEntry *entry;
+  entry = (NatEntry *)key;
+  [entry release];
+  return 0;
+}
+
+
+
+// ---------------------------------------------------------------------------------
+//	¥ natApparentCompare()
+// ---------------------------------------------------------------------------------
+// used as avl_key_compare_fun_type
+int natApparentCompare (void * compare_arg, void * a, void * b)
+{
+  NatEntry *ta;
+  NatEntry *tb;
+  ta = (NatEntry *)a;
+  tb = (NatEntry *)b;
+  
+  return [ta compare:tb];
+}
+
+

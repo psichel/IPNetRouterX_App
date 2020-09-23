@@ -1,0 +1,437 @@
+//
+//  RouteWindowC.m
+//  IPNetRouterX
+//
+//  Created by psichel on June 08 2004.
+//  Copyright (c) 2004 Sustainable Softworks. All rights reserved.
+
+#import "RouteWindowC.h"
+#import "RouteServer.h"
+#import "RouteEntry.h"
+#import "RouteTable.h"
+#import "ArpTable.h"
+#import "AppDelegate.h"
+#import "SentryDocument.h"
+#import "SentryState.h"
+#import "SentryModel.h"
+#import "PSSharedDictionary.h"
+#import "PsClient.h"
+#import "PSURL.h"
+#import "PSSupport.h"
+#import "IPSupport.h"
+#import "SystemConfiguration.h"
+
+@implementation RouteWindowC
+- init
+{
+    if (self = [super init]) {
+        // initialize instance vars
+		// use awakeFromNib
+    }
+    return self;
+}
+- (void)dealloc
+{
+	// release any vars we allocated
+	// use windowWillClose
+    [super dealloc];
+}
+
+- (void)awakeFromNib {
+	PSSharedDictionary* sd = [PSSharedDictionary sharedInstance];
+	SentryState* sentryState = [[SentryModel sharedInstance] sentryState];
+	// Retain ourself so caller can release reference.  Released in windowWillClose:
+	[self retain];	
+
+	// disable if application is not yet registered
+    if ([[sd objectForKey:kCheck1] intValue] &&
+		[[sd objectForKey:kCheck2] intValue] &&
+		[[sd objectForKey:kCheck3] intValue]) {
+		[routeListButton setEnabled:YES];
+		[arpListButton setEnabled:YES];
+	}
+	else {
+		[routeListButton setEnabled:NO];
+		[arpListButton setEnabled:NO];
+		[statusInfo setStringValue:NSLocalizedString(@"Trial period expired",
+			@"Trial period expired")];
+	}
+
+#ifdef IPNetRouter
+	// set data source for route table
+	if (![sentryState routeTable]) {
+		[sentryState setRouteTable:[[[RouteTable alloc] init] autorelease]];
+	}
+	[self setRouteDataSource:[sentryState routeTable]];
+
+	// set data source for arp table
+	if (![sentryState arpTable]) {
+		[sentryState setArpTable:[[[ArpTable alloc] init] autorelease]];
+	}
+	[self setArpDataSource:[sentryState arpTable]];
+#endif
+    // setup table cells for editing from corresponding nib outlets
+        // restore
+	NSTableColumn* tableColumn;
+	//[restoreCB setBordered:NO];
+    tableColumn = [routeTableView tableColumnWithIdentifier:RE_restore];
+    [tableColumn setDataCell:[restoreCB cell]];
+    tableColumn = [arpTableView tableColumnWithIdentifier:RE_restore];
+    [tableColumn setDataCell:[restoreCB cell]];
+
+    // load port menu
+	[routeNetworkPortPopUp removeAllItems];
+	[arpNetworkPortPopUp removeAllItems];
+	NSArray* portList = [[SystemConfiguration sharedInstance] currentInterfaceTitles];
+    if ([portList count] == 0) {
+        [routeNetworkPortPopUp addItemWithTitle:@"No configured interfaces"];
+        [routeNetworkPortPopUp setEnabled:NO];
+        [arpNetworkPortPopUp addItemWithTitle:@"No configured interfaces"];
+        [arpNetworkPortPopUp setEnabled:NO];
+    }
+	else {
+		[routeNetworkPortPopUp addItemsWithTitles:portList];
+		[arpNetworkPortPopUp addItemsWithTitles:portList];
+	}
+
+    // set double click action
+//    [routeTableView setTarget:self];
+//    [routeTableView setDoubleAction:@selector(doubleAction:)];
+    // restore settings
+    NS_DURING
+//        if (str = [preferences objectForKey:kRoutes_parameter])
+//            [parameterPopUp selectItemWithTitle:str];
+//		if (str = [preferences objectForKey:kRoutes_interval]) [intervalField setStringValue:str];
+//        if ([preferences boolForKey:kRoutes_isRunning]) [self monitor:self];
+    NS_HANDLER
+    NS_ENDHANDLER
+	// show list
+	[self routeListButton:nil];
+	[self arpListButton:nil];
+ }
+- (void)windowWillClose:(NSNotification *)aNotification
+{
+    NSWindow* theWindow;
+
+	// remove ourself as delegate
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:nil];
+
+    // remember window frame
+    theWindow = [aNotification object];
+	[theWindow saveFrameUsingName:kRouteName];
+    // remember settings
+//    [preferences setObject:[[parameterPopUp selectedItem] title] forKey:kRoutes_parameter];
+//	[preferences setObject:[intervalField stringValue] forKey:kRoutes_interval];
+//    [preferences setBool:isRunning forKey:kRoutes_isRunning];
+    // release ourself
+    [self autorelease];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ setRouteDataSource
+// ---------------------------------------------------------------------------
+// set and retain data source for port map table view
+- (void)setRouteDataSource:(RouteTable *)value
+{
+	RouteTable* prev;
+	[value retain];
+	prev = [routeTableView dataSource];
+	[routeTableView setDataSource:value];
+	[prev release];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ setArpDataSource
+// ---------------------------------------------------------------------------
+// set and retain data source for port map table view
+- (void)setArpDataSource:(ArpTable *)value
+{
+	ArpTable* prev;
+	[value retain];
+	prev = [arpTableView dataSource];
+	[arpTableView setDataSource:value];
+	[prev release];
+}
+
+
+#pragma mark -- actions --
+// ---------------------------------------------------------------------------
+//	¥ routeListButton
+// ---------------------------------------------------------------------------
+- (IBAction)routeListButton:(id)sender
+{	
+	if (![routeListButton isEnabled]) return;
+
+	 // clear previous status
+	[statusInfo setStringValue:@""];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction routeList:nil];
+}
+
+- (IBAction)routeAddButton:(id)sender
+{
+	RouteEntry* entry = [[[RouteEntry alloc] init] autorelease];
+	
+	if (![routeListButton isEnabled]) return;
+	// gather parameters
+	[entry setDestination:[routeDestinationField stringValue]];
+	[entry setGateway:[routeGatewayField stringValue]];
+	[entry setType:[[routeTypePopUp selectedItem] title]];
+	[entry setInterface:bsdNameForTitle([[routeNetworkPortPopUp selectedItem] title])];
+	if ([routeStaticButton intValue]) [entry setAttributes:RE_attributeStatic];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction routeAdd:entry];
+	[self routeListButton:nil];
+}
+
+- (IBAction)routeChangeButton:(id)sender
+{
+	RouteEntry* entry = [[[RouteEntry alloc] init] autorelease];
+	
+	if (![routeListButton isEnabled]) return;
+	// gather parameters
+	[entry setDestination:[routeDestinationField stringValue]];
+	[entry setGateway:[routeGatewayField stringValue]];
+	[entry setType:[[routeTypePopUp selectedItem] title]];
+	[entry setInterface:bsdNameForTitle([[routeNetworkPortPopUp selectedItem] title])];
+	if ([routeStaticButton intValue]) [entry setAttributes:RE_attributeStatic];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction routeChange:entry];
+	[self routeListButton:nil];
+}
+
+- (IBAction)routeDeleteButton:(id)sender
+{
+	RouteEntry* entry = [[[RouteEntry alloc] init] autorelease];
+	
+	if (![routeListButton isEnabled]) return;
+	// gather parameters
+	[entry setDestination:[routeDestinationField stringValue]];
+	[entry setGateway:[routeGatewayField stringValue]];
+	[entry setType:[[routeTypePopUp selectedItem] title]];
+	[entry setInterface:bsdNameForTitle([[routeNetworkPortPopUp selectedItem] title])];
+	if ([routeStaticButton intValue]) [entry setAttributes:RE_attributeStatic];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction routeDelete:entry];
+	[self routeListButton:nil];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ arpListButton
+// ---------------------------------------------------------------------------
+- (IBAction)arpListButton:(id)sender
+{
+	if (![arpListButton isEnabled]) return;
+	
+	 // clear previous status
+	[statusInfo setStringValue:@""];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction arpList:nil];
+}
+
+- (IBAction)arpAddButton:(id)sender
+{
+	ArpEntry* entry = [[[ArpEntry alloc] init] autorelease];
+	NSMutableString* attributes = [NSMutableString stringWithCapacity:64];
+	
+	if (![arpListButton isEnabled]) return;
+	// gather parameters
+	[entry setIpAddress:[arpIPAddressField stringValue]];
+	[entry setHwAddress:[arpHWAddressField stringValue]];
+	[entry setInterface:bsdNameForTitle([[arpNetworkPortPopUp selectedItem] title])];
+	// attributes
+	if ([arpPermanentButton intValue]) [attributes appendString:RE_attributePerm];
+	if ([arpPublishButton intValue]) [attributes appendString:RE_attributePublish];
+	if ([arpProxyButton intValue]) [attributes appendString:RE_attributeProxy];
+	[entry setAttributes:attributes];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction arpAdd:entry];
+	[self arpListButton:nil];
+}
+
+- (IBAction)arpDeleteButton:(id)sender
+{
+	ArpEntry* entry = [[[ArpEntry alloc] init] autorelease];
+	NSMutableString* attributes = [NSMutableString stringWithCapacity:64];
+	
+	if (![arpListButton isEnabled]) return;
+	// gather parameters
+	[entry setIpAddress:[arpIPAddressField stringValue]];
+	[entry setHwAddress:[arpHWAddressField stringValue]];
+	[entry setInterface:bsdNameForTitle([[arpNetworkPortPopUp selectedItem] title])];
+	// attributes
+	if ([arpPermanentButton intValue]) [attributes appendString:RE_attributePerm];
+	if ([arpPublishButton intValue]) [attributes appendString:RE_attributePublish];
+	if ([arpProxyButton intValue]) [attributes appendString:RE_attributeProxy];
+	[entry setAttributes:attributes];
+	// launch request
+	RouteAction* routeAction = [RouteAction sharedInstance];
+	[routeAction setDelegate:self];
+	[routeAction arpDelete:entry];
+	[self arpListButton:nil];
+}
+
+#pragma mark -- help --
+// ---------------------------------------------------------------------------
+//	¥ myHelp
+// ---------------------------------------------------------------------------
+- (IBAction)myHelp:(id)sender
+{
+    NSString *filePath;
+	NSURL *fileURL;
+    NSBundle *thisBundle = [NSBundle bundleForClass:[self class]];
+    
+    if (filePath = [thisBundle pathForResource:@"RoutesHelp" ofType:@"html" inDirectory:PS_HELP_DIRECTORY])
+		if (fileURL = [NSURL fileURLWithPath:filePath])
+			[[NSWorkspace sharedWorkspace] openURL:fileURL];
+}
+
+#pragma mark -- events --
+
+// ---------------------------------------------------------------------------
+//	¥ tableViewSelectionDidChange
+// ---------------------------------------------------------------------------
+// transfer info from selected entry
+- (void)tableViewSelectionDidChange:(NSNotification *)aNotification
+{
+	int tab, row, i, count;
+	NSString* str;
+	NSArray* portList;
+	NSString* bsdName;
+	
+	tab = [tabView indexOfTabViewItem:[tabView selectedTabViewItem]];
+	if (tab == 0) {		// route tab
+		RouteEntry* entry;
+		row = [routeTableView selectedRow];
+		if (row >= 0) {
+			entry = [[routeTableView dataSource] objectAtIndex:row];
+			// route type
+			str = [entry type];
+			[routeTypePopUp selectItemWithTitle:str];
+			// destination, gateway, comment
+			if (str = [entry destination]) [routeDestinationField setStringValue:str];
+			if (str = [entry gateway]) [routeGatewayField setStringValue:str];
+			// attribute(s)
+			[routeStaticButton setIntValue:0];
+			if (str = [entry attributes]) {
+				NSRange range;
+				range = [str rangeOfString:RE_attributeStatic];
+				if (range.length) [routeStaticButton setIntValue:1];
+			}
+			// transfer interface to port name popup
+			portList = [routeNetworkPortPopUp itemTitles];
+			count = [portList count];
+			for (i=0; i<count; i++) {
+				bsdName = bsdNameForTitle([portList objectAtIndex:i]);
+				if ([bsdName isEqualTo:[entry interface]]) {
+					[routeNetworkPortPopUp selectItemAtIndex:i];
+					break;
+				}
+			}
+		}
+	}
+	else if (tab == 1) {	// arp tab
+		ArpEntry* entry;
+		row = [arpTableView selectedRow];
+		if (row >= 0) {
+			entry = [[arpTableView dataSource] objectAtIndex:row];
+			// ipAddress, hwAddress, comment
+			if (str = [entry ipAddress]) [arpIPAddressField setStringValue:str];
+			if (str = [entry hwAddress]) [arpHWAddressField setStringValue:str];
+			// attributes
+			[arpPermanentButton setIntValue:0];
+			[arpPublishButton setIntValue:0];
+			[arpProxyButton setIntValue:0];
+			if (str = [entry attributes]) {
+				NSRange range;
+				range = [str rangeOfString:RE_attributePerm];
+				if (range.length) [arpPermanentButton setIntValue:1];
+				range = [str rangeOfString:RE_attributePublish];
+				if (range.length) [arpPublishButton setIntValue:1];
+				range = [str rangeOfString:RE_attributeProxy];
+				if (range.length) [arpProxyButton setIntValue:1];
+			}
+			// transfer interface to port name popup
+			portList = [arpNetworkPortPopUp itemTitles];
+			count = [portList count];
+			for (i=0; i<count; i++) {
+				bsdName = bsdNameForTitle([portList objectAtIndex:i]);
+				if ([bsdName isEqualTo:[entry interface]]) {
+					[arpNetworkPortPopUp selectItemAtIndex:i];
+					break;
+				}
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+//	¥ updateParameter:withObject:
+// ---------------------------------------------------------------------------
+- (BOOL)updateParameter:(NSString *)name withObject:(id)object
+{
+	NSDictionary* info;
+	if (name && object) {
+		info = [[NSDictionary alloc] initWithObjectsAndKeys:object, name, nil];
+		[self receiveDictionary:info];
+		[info release];
+	}
+	return YES;
+}
+
+#pragma mark -- <ControllerFromThread> --
+- (oneway void)receiveDictionary:(NSDictionary *)dictionary
+// update parameters passed in dictionary
+// Uses key as the name of a class or instance and sets its value
+{
+    NSEnumerator *enumerator = [dictionary keyEnumerator];
+    id key;
+    id object;
+	NSMutableArray* currentList;
+	SentryState* sentryState = [[SentryModel sharedInstance] sentryState];
+	
+	{
+		while ((key = [enumerator nextObject])) { 
+			/* code that uses the returned key */
+			if (![key isKindOfClass:[NSString class]]) continue; 
+			object = [dictionary objectForKey:key];
+			if ([object isKindOfClass:[NSString class]]) {	// assign string values
+				if (NO);
+				// status
+				else if ([key isEqualTo:@"statusInfo"])	[statusInfo setStringValue:object];
+			}
+			else if ([key isEqualTo:kRouteList]) {
+				// update table
+				currentList = (NSMutableArray *)object;
+				RouteTable* routeTable = [sentryState routeTable];
+				[routeTable setRouteArray:currentList];	// set table to use new list
+				[routeTableView reloadData];
+				break;
+			}
+			else if ([key isEqualTo:kArpList]) {
+				// update table
+				currentList = (NSMutableArray *)object;
+				ArpTable* arpTable = [sentryState arpTable];
+				[arpTable setArpArray:currentList];		// set table to use new list
+				[arpTableView reloadData];
+				break;
+			}
+		}   // while ((key = [enumerator nextObject]))
+	}
+}
+
+
+@end

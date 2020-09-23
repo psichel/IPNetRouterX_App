@@ -1,0 +1,679 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf230
+{\fonttbl\f0\fnil\fcharset0 Geneva;\f1\fnil\fcharset0 Monaco;\f2\fnil\fcharset0 Verdana;
+}
+{\colortbl;\red255\green255\blue255;\red137\green19\blue21;\red51\green51\blue51;\red36\green36\blue36;
+}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+
+\f0\fs24 \cf0 IPNetRouterX Release Notes\
+Copyright \'a92003-2011 Sustainable Softworks, Inc.\
+http://www.sustworks.com\
+\
+Oct 18, 2011 - IPNetRouterX 1.6c2\
+\'95 Fixes for loading NKE and 64-bit structure aligment. \
+\
+August 19, 2011 - IPNetRouterX 1.6c1\
+\'95 Rebuild NKE as 32/64-bit Universal.\
+\
+Oct 15, 2009 - IPNetRouterX 1.5c1\
+\'95 Show Demo Startup when trial has expired.\
+\'95 Update license text in Demo Startup.\
+\'95 Address Scan: added tcp port 3389 RDP to list of well known protocol ports.\
+\'95 Help menu: added "Feedback" menu item and fixed "ReadMe" to point to the correct file.\
+\'95 About box: make Email address and web URL clickable.\
+\'95 Fix splash window.\
+\'95 Restore Help button on First Run athorization alert.\
+\'95 Ask for authorization only once from non-admin account.\
+\
+May 28, 2009 - IPNetRouterX 1.4\
+\'95 Restructure project files to use Subversion based revision control.\
+\'95 System Requirements are now 10.4 or later.\
+\'95 Release as version 1.4\
+Note this version may require a paid upgrade.\
+\
+Apr 30, 2009 - IPNetRouterX 1.4c4\
+\'95 Fix Ethernet bridging to configure promiscous mode correctly.\
+\'95 Don't load balance packets that have already been redirected using "RouteTo" filter action.\
+\'95 Allow "Source Aware Active Open" by checking if a previous connection arrived from the same host.\
+\'95 Application launch - skip asking for upgrade if there is a valid upgrade key in the pasteboard.\
+\'95 Upgrade - ask user to authenticate to remove old key if necessary when upgrading, so upgrade will override any previous key even if not writable by the currently logged in user.\
+\
+Mar 13, 2009 - IPNetRouterX 1.4c3\
+\'95 Fix checking for idle time to handle equal comparisons correctly.\
+\'95 DHCP Server: fix to recognize messages from Relay Agent that match a Lease Options record.\
+\'95 DHCP Server: do not stop server when application quits since it might be running from another instance.\
+\'95 Avoid repeated first run install alerts by not trying to install admin only tools when run from non-admin account.\
+\'95 Fix possible bug in updating Security Log save to disk interval.\
+\'95 Reorganized demo startup to be more consistent and support paid upgrades.\
+\
+Sep 19, 2008 - IPNetRouterX 1.4c2\
+\'95 Fix possible timing conflict when replacing and authorizing helper tools.\
+\'95 DHCP Server: fix to recognize DHCP Requests to a static config address whose lease binding has expired.\
+\'95 DHCP Server: fix to accept DHCP Requests from a host that already has the requested IP address when the server has no previous record of that lease binding.\
+\
+Aug 6, 2008 - IPNetRouterX 1.4c1\
+\'95 First Run Install: pause after copy phase to allow time for file system to stabilize.\
+\'95 First Run Install: changed to work the same for non-admin accounts.\
+\'95 ICMP: self repair ICMP server connection if it dies unexpectedly.\
+\'95 Fixed obscure memory leaks found using Apple's Clang tool.\
+\'95 Fixed possible kernel panic when enable transparent proxy to a local server on the gateway.\
+\'95 DHCP Server: convert log messages to use \\r\\n instead of \\r as line separator for better SMTP compatibility.\
+\
+May 30, 2008 - IPNetRouterX 1.3.6\
+\'95 Source Aware Routing: fixed bug in rewriting destination MAC address.\
+\'95 Traffic Discovery: turn off TD explicitly if no previous setting was saved.\
+\'95 Preferences: added "Save to log interval" of 10 seconds.\
+\'95 Sentry Log: added timer to force periodic update at log interval.\
+\'95 Create symbolic link to daily security log named "security log today.txt"\
+\'95 DHCP static config - include ClientID field in import/export.\
+\
+May 7, 2008 -  IPNetRouterX 1.3.5\
+\'95 Add "invalid" table under Trigger tab to remember source IP address of packets with short transport headers.\
+\'95 Rename "IPNetRouterX_startup.app" to "IPNetRouterX_startup" since it no longer contains an application, but rather a shell script.\
+\'95 Fixed problems with launching at startup or login time before interfaces have stabilized.\
+\'95 Fixed bug in checking code signature of admin only tools when run from non admin account.\
+\'95 If code signature is not verified and user chooses quit, re-install all tools on next launch to attempt repair.\
+\'95 Cleanup system.log messages when run from non admin account.\
+\'95 Lookup: add support for IPv6 and display any IPv6 addresses returned.\
+\'95 Lookup: added "Show DNS" button.\
+\'95 Tool history: keep 10 entries in addition to any suggested local configuration values.\
+\
+April 3, 2008 -  IPNetRouterX 1.3.4\
+\'95 Skip re-downloading interface parameters in response to 
+\f1\fs20 \cf2 \CocoaLigature0 KEV_DL_LINK_ON.\
+
+\f0\fs24 \cf0 \CocoaLigature1 \'95 Fixed bug in restoring triggers from daemon when 2nd instance is launched from Finder.\
+\'95 Improved configuring HelperTools when newer versions are present.\
+\
+Mar 26th, 2008 -  IPNetRouterX 1.3.3\
+\'95 Improve test for authorization succeeded.\
+\'95 Filter table: update rule count consistently when rules are added or deleted.\
+\'95 Skip downloading interfaces that report not available from the SCF.\
+\'95 Consolidate interface table download and attach NKE.\
+\'95 Update nib file to change "Break" to "Exit group".\
+\
+Mar 18th, 2008 -  IPNetRouterX 1.3.2\
+\'95 Fixed panic in Mac OS X 10.3.9 version of NKE.\
+\'95 Demo Startup Dialog: center on screen.\
+\'95 Register: remember window position.\
+\'95 Check For Update: remember window position.\
+\'95 Allow launch without displaying document window.\
+\'95 Load empty documents with currently active settings before saving.\
+\'95 Rename "Break" filter action to "Exit group".\
+\
+Mar 11th, 2008 -  IPNetRouterX 1.3.1\
+\'95 Attach and download any modified interfaces during Apply.\
+\'95 Pause and retry pinging a RouteTo target to resolve the MAC address if needed.\
+\'95 Filter Table: Always allow editing parameter column.\
+\
+Mar 5th, 2008 -  IPNetRouterX 1.3\
+\'95 DHCP Server: do not scroll status table when updating.\
+\'95 Lookup: update "Flush Cache" button to use "dscacheutil -flushcache" on Leopard instead of lookupd.\
+\'95 Show number of filter rules and warn if limit of 600 is exceeded.\
+\'95 Update license to cover "Software Upgrades" and "Educational Users" per new shopping cart on website.\
+\'95 Release as version 1.3
+\f2\fs22 \cf3 \
+
+\f0\fs24 \cf0 \
+Jan 11, 2008 -  IPNetRouterX 1.3c11\
+\'95 Relocate helper tools to "/Library/Application Support/IPNetRouterX/HelperTools".\
+\'95 Move other modifiable resources out of Application bundle.\
+\'95 Changed launch as startup item mechanism to use a separate startup item package.\
+\'95 Sign each helper tool using Leopard Code Signing.\
+\'95 Sign IPNetRouterX app.\
+\'95 Remove "Unauthorize Tools..." from application menu since app can be moved and copied freely.\
+\'95 Use standard help button from latest Interface Builder.\
+\'95 Help: search only the localized help book for the page requested.\
+\'95 Build with Xcode 3.0 under Leopard.\
+\'95 Catch NSInternalConsistencyError when threads terminate normally.\
+\'95 Check for interrupted system call on read().\
+\'95 Streamline attaching NKE to an interface.\
+\'95 Allow address ranges (a-b or x.x.x.x/prefixlen) in filter table.\
+\'95 DHCP Server: don't hand out previously bound lease if no longer in static or dynamic pool.\
+\
+Oct 16, 2007 -  IPNetRouterX 1.3c10\
+\'95 Fixed symbol collision in NKE to be compatible with most recent Leopard seed.\
+\'95 Email notification: use UNIX sendmail in place of Message.framework to be daemon safe.\
+\'95 Fixed "From:" header in Email notifications from trigger events.\
+\'95 Show active firewall settings when launched if firewall is already running.\
+\'95 Alternate Route: fix restoring duplicate entries.\
+\'95 Growl Support: don't initialize Growl when running as a Startup Item.\
+\'95 DHCP Server: fix getting host DNS info.\
+\'95 Trigger Table: fix possible overflow bug when importing large trigger list.\
+\
+Sep 10, 2007 -  IPNetRouterX 1.3c9\
+\'95 Converted DHCP Server to run as a separate process.\
+\'95 Add trigger entry for "Short TCP Header" packets.\
+\'95 Maintain trigger duration more consistently.\
+\'95 Move saved trigger table to /Library/Preferences/IPNetRouterX/triggerTable.\
+\'95 Remove DHCP WatchDog Timer.\
+\
+Jul 2, 2007 -  IPNetRouterX 1.3c8\
+\'95 DHCP Server: begin refactoring to run as a separate process (in progress).\
+\'95 DHCP Server: fixed byte order bug for IP address options on Intel.\
+\'95 Trigger Import: allow both Mac "\\r" and UNIX "\\n" line endings.\
+\'95 Trigger import: ignore comment lines beginning with "#".\
+\pard\pardeftab720
+\cf4 \'95 Open help files in Apple Help Viewer by default, or the users default web browser if the Option key is down when help is selected.\
+\pard\pardeftab720
+\cf0 \
+Jun 7, 2007 -  IPNetRouterX 1.3c7\
+\'95 Display inactive BSD interfaces such as "tun" or "tap" that do not appear in SCF.\
+\'95 Don't check address family (AF_INET) when reading mask from routing socket since tap driver doesn't set this.\
+\'95 Allow Ethernet bridging to "tap" devices.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardeftab720
+\cf0 \'95 DHCP Server Options Table: added column for Option Type to support both Text and IP Addresses (comma separated list).\
+\'95 NKE: Fixed bug in checking if pullup needed.\
+\pard\pardeftab720
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+\cf0 May 16, 2007 -  IPNetRouterX 1.3c6\
+\'95 Filters: added "Block IPv6" option.  Do not otherwise log IPv6 traffic.\
+\'95 Bypass outbound NAT if "unregistered_only" and destination is on the same IP subnet as external NAT interface (this allows direct connections between locally attached hosts on either side of the gateway).\
+\'95 Fix possible freeze on startup when application is launched from an account without admin privileges.\
+\'95 Fix possible crash when flipping between current and previous saved settings.\
+\
+May 3, 2007 -  IPNetRouterX 1.3c5\
+\'95 Fix ipfw log format to be compatible with Open Door's "Who's There Firewall Advisor".\
+\'95 Save logs to disk at regular intervals for continuous update if selected in preferences.\
+\'95 Changed network stack order for bridging outbound packets to improve DMZ support.\
+\'95 Fixed possible authorization conflict when launching as a login item.\
+\'95 Add "unregistered_only" option similar to UNIX natd.\
+\
+April 18, 2007 -  IPNetRouterX 1.3c4\
+\'95 DHCP Server - re-enable bpftransmit for sending non-subnet broadcasts.\
+\'95 DHCP Server - fixed harmless warning message "htonDHCPOption unrecognized DHCP Option 15".\
+\'95 DHCP Server - Don't stuff ARP cache when useBPF enabled.\
+\'95 DHCP Server - fixed code from UNIX arp tool to not leak a routing socket.\
+\'95 DNS Server - improved method for finding an existing instance of named.\
+\'95 Fix bug introduced in terminating outstanding select on a socket.\
+\'95 Email notification: include sender mail address and name explicitly in message headers.\
+\'95 Added support for Growl notifications.\
+\
+Mar 29, 2007 -  IPNetRouterX 1.3c3\
+\'95 DHCP Server: added "import" and "export" buttons for Static Config table.\
+\'95 DHCP Server: ignore empty hardware addresses in Static Config table.\
+\'95 Trigger Import: change to use window sheet.\
+\'95 Fixed "Route to" filter action to rewrite source MAC address to work with external bridges.\
+\'95 Fixed possible crash during UDP Listener abort.\
+\'95 Fixed leaking socket pair (stream pipe) during open raw socket.\
+\'95 Fixed Drop Connection response byte order bug on Intel.\
+\'95 Traffic Discovery: release innactive data.\
+\
+Mar 14, 2007 -  IPNetRouterX 1.3c2\
+\'95 Fix NKE incompatibility with 10.3.9 .\
+\'95 Fixed possible exception if PPP interface with no user name encountered.\
+\'95 Fixed bug in adding alternate route entries.\
+\'95 Fixed bug in converting zero length Ethernet addresses.\
+\'95 Skip NAT for broadcast and multicast packets received on an internal interface in case Exposed Host is set to none.\
+\'95 Traffic Discovery: restructure for possible threading.\
+\
+Jan 19, 2007 - IPNetRouterX 1.3c1\
+\'95 Add Alternate Route tool with support for Automatic Failover, Load Balance, and Source Aware Routing.\
+\'95 DHCP Server: fix bug in old BSD arp code that could cause server to hang.\
+\'95 Preferences: add option to disable Command-Q as a shortcut for Quit.\
+\'95 NAT View: fixed bug in remaining count when deleting.\
+\'95 Diagnostic: added diagnostic help text.\
+\
+Dec 27, 2006 - IPNetRouterX 1.2.3\
+\'95 DHCP Server: split DHCP status table into 16 lease clusters to scale smootly to thousands of DHCP clients.\
+\'95 DHCP Server: fix possible CPU hogging bug when stopping DHCP Server.\
+\'95 Traffic Discovery: save plist data in binary format for speed and reliability.\
+\
+Dec 21, 2006 - IPNetRouterX 1.2.2\
+\'95 Restore NKE attach state when PPPoE interface reappears in SCF.\
+\'95 DNS Server: allow configurations with no external interfaces.\
+\'95 DNS Server: update serial numbers in zone files automatically.\
+\'95 DNS Server: added "show log" button.\
+\
+Dec 14, 2006 - IPNetRouterX 1.2.1\
+\'95 Fixed to work on Leopard Preview (Mac OS X 10.5).\
+\'95 Fix byte order bug in Filter Source or Dest Net.\
+\'95 Trigger Table: fix out of memory problem when importing large data sets (tag-import-delete; keep free list; detect memory exhaustion and try again later).\
+\'95 Add "Diagnostic" window under help menu to report NKE memory use.\
+\'95 Interfaces: fix problem restoring parameter="last time".\
+\'95 Terminate threads explicity to avoid possible APE conflict.\
+\'95 DHCP Server: send using regular socket instead of bpftransmit to support virtual machines.\
+\
+Oct 27, 2006 - IPNetRouterX 1.2\
+\'95 Release as version 1.2 (Universal Binary).\
+\'95 Filters and Port Mapping: change to use NSComboBoxCells for corresponding table columns.\
+\'95 Numerous documentation updates including: Group, Break, and Route to filter actions, matching internal and external interfaces.\
+\'95 Update tool tips.\
+\'95 Remove any alternate routes when Automatic Failover is turned off.\
+\
+Oct 23, 2006 - IPNetRouterX 1.2c7\
+\'95 Fix bug in configuring named for the first time.\
+\'95 Update named is running status every 10 seconds while DNS Server window is open.\
+\'95 Update named when System Configuration changes.\
+\'95 Allow Local NAT to non-directly attached IP subnets.\
+\'95 Filters: allow matching "internal" or "external" interface.\
+\'95 Filters: separate parameter from stats.\
+\'95 Filters: update value combo box when cell is about to be displayed.\
+\'95 Interfaces: add automatic failover button.\
+\'95 DHCP Server: add Save button that completes any editing in progress before saving.\
+\
+Oct 5, 2006 - IPNetRouterX 1.2c6\
+\'95 Fix Ethernet Bridging on Intel.\
+\'95 Fix bug in Ethernet bridging when copying packets with external clusters.\
+\'95 Add DNS Server tool for configuring Local Caching DNS.\
+\
+Sep 7, 2006 - IPNetRouterX 1.2b5 (beta)\
+\'95 Fix panic on 10.3.9 caused by unlocking network funnel during packet injection.\
+\'95 Fix byte swapping bug in handling fragment length.\
+\'95 Fix DHCP Server to work on Intel.\
+\'95 Fix authorization conflict that affected some Intel systems.\
+\'95 Fix possible dropped connectons (especially iChat) from premature time out.\
+\'95 Fix save and restore window position of Expert View.\
+\'95 Fix Help menu.\
+\
+Aug 31, 2006 - IPNetRouterX 1.2b4 (beta)\
+\'95 Build Application and NKE as Universal Binary.\
+\'95 Numerous updates to support Intel architecture.\
+\'95 Consilidate packet injection and byte swapping code.\
+\'95 TCP Flow: add support for tcpflow on Intel and repackage as part of the application bundle.\
+\'95 Trigger table: add import/export dialog to save trigger entries as Tab Seprated Values (plain text).\
+\'95 Trigger table: remove limit on trigger table size for entries imported through user interface.\
+\'95 Allow address ranges in Trigger Table.\
+\'95 Handle comments in "Triggered by" field consistently.\
+\'95 Fixed bug in logging IP addresses.\
+\'95 Support outbound NAT on "RouteTo" filter action.\
+\'95 DHCP Server: fix bug in editing lease time and lease granted messages.\
+\'95 NAT: disable hair pin feature.\
+\'95 Remove 2nd copy of log file in ".plist" format, use Traffic Discovery instead.\
+\'95 Begin implementing remote configuration using TCP/IP client server model (Remote menu).\
+\'95 Begin adding scriptability (sdef).\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 May 11, 2006 - IPNetRouterX 1.2c3\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+\cf0 \'95 Traffic Discovery: fix possible overflow when calculating percent.\
+\'95 Traffic Discovery: fix log rollover at end of interval.\
+\'95 Address Scan: resolve synchronization issue.\
+\'95 DHCP Server: resolve possible synchronization issue.\
+\'95 NKE: fix possible panic if mbuf_finalize_outbound() pulls up to a new mbuf.\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 May 3, 2006 - IPNetRouterX 1.2c2\
+\'95 Traffic Discovery: Allow sort by data column with interval one second.\
+\'95 Traffic Discovery: View by Service - include protocol in service identifier.\
+\'95 Traffic Discovery: View by Netflow - include protocol in netflow identifier.\
+\'95 Traffic Discovery: track ICMP services by type and code.\
+\'95 Traffic Discovery: update network interface with each minute sample to accomodate changing interfaces.\
+\'95 Traffic Discovery: write out logs when Preferences update logs button is pressed.\
+\'95 NAT: Support hair pin routing to replace Local NAT. If destination IP address matches the NAT address and packet is outbound, do inbound NAT and reflect packet back up stream.\
+\'95 Fix to recognize alternate kernel event notifications KEV_DL_LINK_ON and KEV_DL_LINK_OFF.\
+\'95 Built against Mac OS X 10.4 Universal headers in preparation for Universal Binary.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 Apr 25, 2006 - IPNetRouterX 1.2c1\
+\'95 Added Traffic Discovery tool (replacing previous bandwidth analyzer).  See online help for details.\
+\'95 Incorporate app code changes for Intel transition.\
+\'95 Fixed bug in specifying alternate gateway for automatic failover.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural
+\cf0 Dec 31, 2005 - IPNetRouterX 1.1.2\
+\'95 Port Mapping: add support for local Transparent Proxies to the gateway itself.\
+\
+Nov 29, 2005 - IPNetRouterX 1.1.1\
+\'95 Fix NAT to support systems with dual Ethernet built-in.\
+\'95 Fix to save new documents to default location.\
+\
+Nov 15, 2005 - IPNetRouterX 1.1\
+\'95 Releae as version 1.1\
+\'95 Fix possible window server conflict when launched as a startup item.\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720
+\cf0 Nov 10, 2005 - IPNetRouterX 1.1c11\
+\'95 Port Mapping: Add support for Transparent Proxies (apparent address wild cards).\
+\'95 Fix bug in matching data content.\
+\'95 Fix possible panic if connection table overflows.\
+\'95 Restructure Attach and Detach NKE to improve logging and consistency.\
+\'95 Startup Item: correct startup item permissions for 10.4.2 .\
+\'95 Improve locking model under Panther.\
+\'95 Update IPNetRouterX Help to include Transparent Proxies, Automatic Failover, Source Aware Routing, Bandwidth Allocation, and other recent changes.\
+\
+Sep 28, 2005 - IPNetRouterX 1.1c10\
+\'95 User Interface: refactor document structure to support two different views: "Basic Setup" and "Expert View".  \
+\'95 User Interface: re-order tabs as Interfaces, Port Mapping, Filters, Triggers.\
+\'95 Enable the Apply button when there are changed settings to apply.\
+\'95 Port Mapping: fix bug in mapping all ports (static NAT).\
+\'95 Port Mapping: don't allow duplicate Apparent or Actual endpoints.\
+\'95 Port Mapping: add column to selectively disable port map entries.\
+\'95 Port Mapping: add "Port Map Logging" mode to help debug port map settings.\
+\'95 Port Mapping: preserve Dynamic info to NKE.\
+\'95 Preferences: save preference settings to a common location regardless of user login.\
+\'95 DHCP Server: use router address when no DNS information found.\
+\'95 DHCP Server: use BPF tap to send broadcast and hardware unicast packets.\
+\'95 Fix checksum conflict in Single Ethernet configurations by calling mbuf_inbound_modified on outbound packets to work around bug in mbuf_outbound_finalize() KPI.\
+\'95 Fix "Exclude Net" to apply to NAT entries only.\
+\'95 Save and restore source aware routing state consistently.\
+\'95 Address Scan: work around bug in NSScanner.\
+\
+Aug 26, 2005 - IPNetRouterX 1.1c9\
+\'95 Add filter action "Route To" with parameter of next hop IP address for conditional routing.\
+\'95 Make "Source Aware Routing" user setable.\
+\'95 Save and re-use complete frame headers in connection table entry.\
+\'95 Automatic failover: use split route as alternate default gateway.\
+\'95 Fixed possible panic in NAT process if memory allocation fails.\
+\'95 Fixed bug in converting SourceNet and DestNet IP address ranges.\
+\'95 Route/Arp fixed bug in restoring "save" field of table entries.\
+\'95 Fix to always disable alerts when launched as startup item.\
+\'95 Filters: fix order when pasting a list of rules as children.\
+\'95 Filters: add "authorize" rule to default firewall configuration.\
+\'95 Filters: add sample "rate limiting" rules for PPP to default firewall configuration.\
+\
+July 29, 2005 - IPNetRouterX 1.1c8\
+\'95 Fixed possible panic if memory allocation fails.\
+\
+July 26, 2005 - IPNetRouterX 1.1c7\
+\'95 Redesigned TCP Rate limiting for smooth control over a broad range.  Use "filter action" RateLimitIn or RateLimitOut with a single parameter specifying the rate in bits per second.  Can use K or M as in 100K or 1.5M bps.\
+\'95 Interfaces: added Dead Gateway detection with automatic failover to alternate gateway.\
+\'95 Add "Failover Locations" window to specify locations for automatic failover.\
+\'95 Track connections outside of IP filtering.\
+\'95 Enable "Source Aware Routing".\
+\'95 Allow History->Clear to clear log windows.\
+\
+June 1, 2005 - IPNetRouterX 1.1c6\
+\'95 NKE: stream line rate limiting code when not needed.\
+\'95 Trigger Table: fix bug in displaying entries of different types with the same address.\
+\'95 Trigger Table: fix log message when deleting entries.\
+\'95 DHCP Server: support non Ethernet hardware addresses used with FireWire.\
+\'95 DHCP Server: remember if DHCP Log was open between launches.\
+\'95 DHCP Log: cosmetic improvements for Verbose logging.\
+\
+May 25, 2005 - IPNetRouterX 1.1c5\
+\'95 Add "Check for Updates..." item under application menu.\
+\'95 Add support for BSD interfaces not specified in the System Configuration Framework.\
+\'95 Fix to restore settings when launched as a Tiger login item.\
+\
+May 9, 2005 - IPNetRouterX 1.1c4\
+\'95 Avoid recursive lock when starting TCP RST delay timer.\
+\'95 Release lock before injecting packets.\
+\'95 Fix possible panic if sequence list overflows.\
+\
+May 3, 2005 - IPNetRouterX 1.1c3\
+\'95 Fix NKE to ignore unknown ioctls correctly on Tiger.\
+\'95 Fix bug in do_pullup.\
+\
+May 2, 2005 - IPNetRouterX 1.1c2\
+\'95 Fix possible kernel panic for pullup of non-ip datagram.\
+\'95 Fix build configuration that prevented launching on Panther.\
+\
+April 28, 2005 - IPNetRouterX 1.1c1\
+\'95 Rewrite NKE to support Mac OS X 10.4 (Tiger).\
+\'95 Redesign Rate Limiting feature to withhold and insert Acks.  Separate actions for "rate limit in" and "rate limit out".\
+\'95 Fixed bug in unloading and reloading NKE consistently.\
+\'95 AirPort Configuration: added "Save and Restore" checkbox to select whether to restore these AirPort settings when the application is launched or a document opened.\
+\'95 Routes/ARP: added Restore checkbox to the left of each table row to select whether to restore this route when the application is launched or a document opened.\
+\
+March 18, 2005 - IPNetRouterX 1.0.5\
+\'95 Filter Table: fixed bug in matching long interface names.\
+\'95 Filter Table: fixed bug uploading TCP flags with both set and reset values.\
+\'95 Sentry Log: converted download and other text messages to ".plist" format.\
+\
+March 7, 2005 - IPNetRouterX 1.0.4\
+\'95 DHCP Server: tuned ping timeout versus event loop interval to make offer time more consistent.\
+\'95 DHCP Server: eliminate format conversions when searching DHCP tables.\
+\'95 DHCP Server: fixed bug that ignored some display updates.\
+\'95 DHCP Server: fixed bug in interpreting Ethernet Addresses sent as clientID.\
+\'95 DHCP Server: fixed "Ignore BootP" setting.\
+\'95 DHCP Server: fixed "Dynamic BootP" setting.\
+\'95 DHCP Server: scroll to make new row visible after pressing "+".\
+\'95 DHCP Server: don't jump to next row when Enter is pressed during field editing, don't wrap around to first row for Return.\
+\
+February 10, 2005 - IPNetRouterX 1.0.3\
+\'95 Local NAT: fixed bug in translating for Static NAT entries representing other public IPs.\
+\
+February 4, 2005 - IPNetRouterX 1.0.2\
+\'95 Port Mapping (Static NAT): fixed bug in translating port "Any".\
+\'95 DHCP Server, Static Config: fixed bug in matching Hardware Addresses.\
+\'95 Include target information in tool window title.\
+\
+January 18, 2005 - IPNetRouterX 1.0.1\
+\'95 Preferences: reorganize and include Email settings needed by message framework.\
+\'95 Ethernet Bridging: reduce MTU of bridged internal interface to match external interface if needed.\
+\'95 Release as v1.0.1\
+\
+January 10, 2005 - IPNetRouterX 1.1c1\
+\'95 NAT View: added NAT View tool to show NAT table in action.\
+\'95 NAT: age out fully closed connections sooner.\
+\'95 Bridging: fix possible hardware checksum conflict.\
+\'95 Trigger table: allow editing Triggered By column.\
+\'95 Trigger table: preserve last time information between application launches.\
+\'95 Trigger table: remember trigger table independently from saved settings in a separate file when program quits (/Library/Application Support/Sustainable Softworks/triggerTable).\
+\
+December 29, 2004 - IPNetRouterX 1.0\
+\'95 Catch SIGQUIT to terminate normally.\
+\'95 Release as v1.0\
+\
+December 21, 2004 - IPNetRouterX 1.0c16x\
+\'95 NKE: fix possible crash when inserting TCP fragment entry.\
+\'95 NKE: fix possible leak if malloc fails during AVL insert.\
+\
+December 18, 2004 - IPNetRouterX 1.0c16\
+\'95 NKE: fix possible crash if malloc fails during trigger event.\
+\'95 Refactor thread to controller updates for better performance and robustness.\
+\'95 Optimize check for abort in receive threads for better performance.\
+\'95 DHCP: cache date strings to optimize display of NSDate values in tables.\
+\'95 DHCP: optimize status table as an array with dictionary extensions.\
+\'95 DHCP: optimize ipForString().\
+\
+December 9, 2004 - IPNetRouterX 1.0c15\
+\'95 Fix bug in stoping and restarting DHCP Server.\
+\'95 Fix possible exception if DHCP tables are modified while server is running.\
+\'95 Remove delegate retain loops.\
+\'95 Remember log drawer state.\
+\
+December 2, 2004 - IPNetRouterX 1.0c14\
+\'95 Refactor thread controller classes to isolate exceptions and simplify abort and re-initialize.\
+\'95 Fix bug to save log text under corresponding date.\
+\'95 Write a single "sentry.log" file for "ipfw" log format.\
+\'95 Use ASCII string encoding for "ipfw" log format.\
+\'95 Don't log URL Action messages.\
+\'95 Configure NSConnections with explicit time out and queueing options.\
+\'95 DHCP Server: fixed bug in handling OptionParameterList.\
+\'95 Fixed bug in filter URL Action.\
+\'95 Fixed bug in "Add Trigger" from Alert dialog.\
+\'95 NKE: add OSBundleProductName and OSBundleSupportURL KEXT properties for Mac OS X Tiger.\
+\
+November 18, 2004 - IPNetRouterX 1.0c13\
+\'95 DHCP Server: fix Save, Save As, and Revert menu actions.\
+\'95 DHCP Server: catch Distributed Objects exceptions in server requests.\
+\'95 DHCP Server: fixed bug in saving DHCP on/off state.\
+\'95 DHCP Server: write out status table when application terminates.\
+\'95 DHCP Server: use Max Lease Time consistently if less than Default Lease Time.\
+\'95 Sentry Document: fix is document edited state.\
+\'95 Trigger table: allow editing, save/restore, and apply/show to facilitate blocking a list of individual IPs.\
+\'95 Alert: add trigger button to block this IP address.\
+\'95 Change NKE control/server to use direct connection.\
+\
+November 12, 2004 - IPNetRouterX 1.0c12\
+\'95 DHCP Server: fixed bug in Watchdog restarting DHCP Server thread.\
+\'95 Extend public beta expiration.\
+\
+November 3, 2004 - IPNetRouterX 1.0c11\
+\'95 DHCP Server: handle interrupted system calls explicitly.\
+\'95 DHCP Server: force to get a new socket when server is restarted.\
+\'95 DHCP Server: fix bug in maintaining server on state and restarting server.\
+\'95 DHCP Server: fixed bug trying to restore settings before application was authorized.\
+\'95 System Configuration: fix bug in finding active PPP information.\
+\
+October 26, 2004 - IPNetRouterX 1.0c10\
+\'95 Extend public beta expiration.\
+\'95 DHCP state tables - update order of table entries in response to manual edits.\
+\'95 DHCP status table delete entry - write out changes to disk when server is not running.\
+\'95 DHCP Log - add time stamps for messages received and server events.\
+\'95 DHCP Server: explicitly ignore signals in DHCP server threads.\
+\'95 DHCP Server: fix possible deadlock between Distributed Objects messages.\
+\'95 SystemConfiguration - open a separate SCDynamicStoreRef for each request.\
+\'95 SystemConfiguration - combine static PPP services since actual service is defined dynamically.\
+\'95 Filter Action URL: borrow code from IPNetMonitorX Server Scan tool, don't open local tool windows.\
+\'95 Preferences: fixed bug in Email log selections.\
+\'95 Fix registration input, read key, and write key to handle international characters consistently.\
+\'95 Add History menu for recent targets in built-in tools.\
+\
+\
+October 1, 2004 - IPNetRouterX 1.0c9\
+\'95 Fixed bug in Test button not adjusting with window size.\
+\'95 DHCP Server: fixed bug in displaying status if no table was previously saved.\
+\'95 DHCP Server: use locally configured name server if not otherwise specified.\
+\'95 Internet Sharing Help: describe configuring LAN clients.\
+\
+September 8, 2004 - IPNetRouterX 1.0c8\
+\'95 Extend public beta expiration.\
+\'95 DHCP Server: avoid possible deadlock from calling System Configuration Framework from DHCP server thread.\
+\'95 DHCP Server: fix "+" button to find unused entry slot.\
+\'95 DHCP Server: fix to restore previously saved state if server was turned off.\
+\'95 DHCP Server: optimize performance by reworking table classes and screen updates.\
+\'95 Move "Test" button to reside under Filters tab.\
+\'95 FAQ: update instructions for launching as startup item.\
+\'95 Turn off drag-and-drop for now.\
+\
+August 20, 2004 - IPNetRouterX 1.0c7\
+\'95 Extend public beta expiration.\
+\'95 DHCP Server: fixed bug in responding if no name servers found.\
+\'95 DHCP Server: look at both primary and DHCP interface for possible name servers.\
+\'95 DHCP Server: fixed bug in calculating end of dynamic address range.\
+\'95 DHCP Server: display times without seconds.\
+\
+August 2, 2004 - IPNetRouterX 1.0c6x\
+\'95 Fixed autorelease bug in UDP receive thread.\
+\
+July 30, 2004 - IPNetRouterX 1.0c6\
+\'95 Extend public beta expiration.\
+\'95 Fixed bug in restoring Single Ethernet configurations from saved settings.\
+\'95 Show Active: report number of entries received and log any interface entries to verify configuration.\
+\'95 DHCP Server: catch any exceptions that could stop recieve thread.\
+\'95 DHCP Server: fixed bug in showing DHCP Server on/off state consistently.\
+\'95 DHCP Server: look for matching network interface for given BSD Name.\
+\'95 DHCP Server: log any DHCP packets received if verbose logging is enabled.\
+\'95 Connection Logging: write out log every 10 minutes\
+\'95 Connection Logging: update log when a connection entries time out.\
+\'95 Allow up to 500 filter rules.\
+\'95 Disable source aware routing to integrate with filter rules.\
+\
+July 14, 2004 - IPNetRouterX 1.0c5\
+\'95 Extend public beta expiration.\
+\'95 Add support for Ethernet bridging.\
+\'95 Routes: fixed bug in updating routes.\
+\'95 Added back separate window for Sentry Log.\
+\'95 Address Scan: update select service popup to match target field when a scan is invoked.\
+\'95 Address Scan: changed to report "Sent/Received/Lost" more consistently for TCP and UDP scans.\
+\'95 Help Button and Disclosure Triangle: use 10.2.8 compatible controls.\
+\'95 Registration: look for registration data in clipboard so there's no need to paste.\
+\'95 Finish installation when first run is from root account.\
+\'95 Try to unload NKE on first run to make sure latest version will be used.\
+\'95 Improve finding PPP interfaces.\
+\
+June 18, 2004 - IPNetRouterX 1.0c4\
+\'95 Extend public beta expiration.\
+\'95 Fix possible kernel panic if exposed host set to "stealth".\
+\'95 Add Routes/ARP tool allowing comments.\
+\'95 Use default settings at /Library/Preferences/com.sustworks.IPNetRouterX.ipnr when no document is specified.\
+\'95 Remove "Configure As Startup Item" since it is no longer needed (just place the application bundle in the Startup Items folder).\
+\'95 Rename "Current Filters" to "Show Active".\
+\'95 Rename "AirPort" to "AirPort Configuration", fix bug in updating port type, improved error reporting.\
+\'95 DHCP Server: allow comments in Static Config, Dynamic Config, Lease Options, and Server Options table.\
+\'95 DHCP Server: change "new" and "delete" buttons to small square style.\
+\
+June 2, 2004 - IPNetRouterX 1.0c3\
+\'95 Extend public beta expiration.\
+\'95 NKE: fix error recovery if allocating a new NAT entry fails.\
+\'95 NKE: fix error in AVL tree code when succesor does not exist.\
+\'95 Port Mapping: show "0 (all ports)" in port popup.\
+\'95 Port Mapping: show "0 (any)" and "47 (GRE)" in protocol popup.\
+\'95 Port Mapping: preserve "dynamic" and "comment" fields after Show Current.\
+\'95 Help: updated all help text, show context sensitive help for main Document window.\
+\'95 DHCP Server: cache status file upates, skip unnecessary updates when an interface becomes "not available".\
+\
+May 21, 2004 - IPNetRouterX 1.0c2\
+\'95 Extend public beta expiration.\
+\'95 NKE: fix error recovery in AVL tree operations if malloc fails.\
+\'95 Track PPP interface changes in System Configuration Framework.\
+\'95 Port Mapping: update port mappings when PPP address changes.\
+\'95 Preferences: select which logs to Email.\
+\'95 Document Window: add log drawer in place of log window.\
+\'95 DHCP Server: add watchdog timer to restart server if it goes silent.\
+\'95 DHCP Server: use first internal or available interface as default.\
+\'95 DHCP Server: cache current Name Server to hand out to clients as needed.\
+\'95 DHCP Server: add log drawer in place of log window.\
+\'95 DHCP Server: allow saving directly from DHCP Server window.\
+\'95 DHCP Server: support Revert to previously saved.\
+\'95 DHCP Server: Email DHCP log using a separate thread so it doesn't block server.\
+\'95 Create /Library/StartupItems folder with correct permissions if needed.\
+\'95 Add Help button to "First Run" dialog and more complete error reporting when authorization is cancelled.\
+\
+Apr 22, 2004 - IPNetRouterX 1.0c1\
+\'95 Extend public beta expiration.\
+\'95 DHCP Server: improved error checking and recovery.\
+\'95 Terminate any editing in progress when applying settings.\
+\'95 Fixed bug in updating trigger expiration.\
+\'95 Update system IP forwarding whenever settings are applied.\
+\
+Apr 6, 2004 - IPNetRouterX 1.0b7\
+\'95 Extend public beta expiration.\
+\'95 Fixed conflict with hardware checksuming in Single Ethernet configuration.\
+\'95 Reworked matching interfaceIDs to SystemConfiguration services.\
+\'95 DHCP Server: fixed bug in tracking DHCP state between window and server.\
+\'95 DHCP Server: fixed bug in calculating ending address of dynamic address pool.\
+\
+Mar 26, 2004 - IPNetRouterX 1.0b6\
+\'95 Fixed save and restore ipForwarding.\
+\'95 Fix local NAT feature.\
+\'95 Improved NAT lookup performance when ports are busy.\
+\
+Mar 24, 2004 - IPNetRouterX 1.0b5\
+\'95 Extend public beta expiration.\
+\'95 Add "Interface ID" column under interfaces tab.  Fix bug in matching system configuration changes to interface table.  Allow interface name to be edited.\
+\'95 Add "Configure As Startup Item" under application menu to save startupItemSettings.\
+\'95 Configure startup item shell script and property list.\
+\'95 Fixed conflict with hardware checksuming in Single Ethernet configuration.\
+\'95 Fixed possible crash when configuring port mappings for a NAT interface that is "not available".\
+\'95 Modified "Show Current" to load and display status from NKE previously configured by startup item.\
+\'95 Include MacPAD.url as application resource.\
+\
+Mar 12, 2004 - IPNetRouterX 1.0b4\
+\'95 Extend public beta expiration.\
+\'95 Fixed bug in "Single Ethernet" configuration.\
+\'95 Remember selected tabView between application launches.\
+\'95 Preferences: added checkbox to disable on-screen alerts.\
+\'95 Restructure document state to support launching application as a Mac OS X startup item.\
+\'95 Save and restore trigger table as part of settings document.\
+\'95 Show "status info" messages in Sentry Log window.\
+\
+Feb 27, 2004 - IPNetRouterX 1.0b3\
+\'95 Extend public beta expiration.\
+\'95 Fixed Local NAT feature.\
+\'95 Fixed possible crash when closing DHCP Server window.\
+\'95 Fixed bug in updating interfaces when the system configuration changes.\
+\'95 Fixed bug that caused show current to not recognize duplicate entries.\
+\'95 Save logs in /Library/Logs/IPNetRouterX/\
+\'95 Write the Sentry log in ".plist" format as well as any user selected ".txt" form.\
+\
+Jan 21, 2004 - IPNetRouterX 1.0b2\
+\'95 Extend public beta expiration.\
+\'95 Support Mac OS X 10.2.8 or later.\
+\'95 Default settings: set filters and external on first interface only.\
+\'95 Select IP forwarding any time NAT is enabled.\
+\'95 Update interface table before settings are applied.\
+\'95 DHCP Server: fixed bug in tracking expired lease bindings.\
+\'95 DHCP Server: fixed bug in deleting status entries.\
+\'95 DHCP Server: allow editing status entries.\
+\'95 NAT: fixed possible configuration error when OS X reports a different dltag for the same network interface.\
+\'95 Updated help files.\
+\
+Dec 31, 2003 - IPNetRouterX 1.0b1\
+\'95 First public beta of IPNetRouterX.  This version adds IP masquerading (Network\
+Address and Port Translation with inbound port mapping) a DHCP Server, and\
+AirPort configuration to the IPNetSentryX firewall foundation.  As such, it provides\
+in kernel single address space AVL search trees for best in class NAT performance\
+with the maturity of a next generation design based on IPNetRouter classic.\
+\
+Future plans include tools for configuring proxy ARP and routes,\
+Ethernet bridging, and a faceless background version.\
+\
+[End of Release Notes]\
+}

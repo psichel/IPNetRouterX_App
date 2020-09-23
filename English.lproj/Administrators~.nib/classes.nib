@@ -1,0 +1,28 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {
+                deleteButton = id; 
+                doneButton = id; 
+                editButton = id; 
+                editCancelButton = id; 
+                editSaveButton = id; 
+                newButton = id; 
+            }; 
+            CLASS = Users; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                deleteButton = NSButton; 
+                editAddress = NSTextField; 
+                editButton = NSButton; 
+                editName = NSTextField; 
+                editPanel = NSPanel; 
+                editPassword = NSSecureTextField; 
+                tableView = NSTableView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

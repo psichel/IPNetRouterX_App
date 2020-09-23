@@ -1,0 +1,26 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {monitor = id; myHelp = id; useTCPFlow = id; }; 
+            CLASS = TCPDumpController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                options = NSComboBox; 
+                outputText = NSTextView; 
+                portMenu = NSPopUpButton; 
+                scrollView = NSScrollView; 
+                startButton = NSButton; 
+                statusInfo = NSTextField; 
+                useTCPFlowCheckBox = NSButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

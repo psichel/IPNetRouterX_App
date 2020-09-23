@@ -1,0 +1,701 @@
+//
+//  PSPlotView.m
+//  IPNetMonitorX
+//
+//  Created by psichel on Mon Mar 18 2002.
+//  Copyright (c) 2002 Sustainable Softworks. All rights reserved.
+//
+//  Encapsulates drawing a monitor plot from an array of data elements
+
+#import "PSPlotView.h"
+#import "PSPlotEntry.h"
+
+@interface PSPlotView (PrivateMethods)
+- (void)plotBackground;
+- (void)plotData;
+- (float)barHeightForValue:(u_long)value;
+- (NSString *)legendForValue:(u_long)value;
+- (void)findMax;
+@end
+
+@implementation PSPlotView
+- (id)initWithFrame:(NSRect)frame
+{
+    self = [super initWithFrame:frame];
+    data = [[NSMutableArray alloc] initWithCapacity:64];
+    plotCount = 0;
+    scaleMax = 0;
+    useLinearScale = YES;
+	// colors
+	r1 = [[NSColor greenColor] retain];
+	//r2 = [[NSColor blueColor] retain];
+	r2 = [[NSColor colorWithCalibratedRed:0.75 green:1.0 blue:0.75 alpha:1.0] retain];
+	r3 = [[NSColor orangeColor] retain];
+	t1 = [[NSColor redColor] retain];
+	//t2 = [[NSColor blueColor] retain];
+	t2 = [[NSColor colorWithCalibratedRed:1.0 green:0.75 blue:0.75 alpha:1.0] retain];
+	t3 = [[NSColor orangeColor] retain];
+    [self updateScale];
+    return self;
+}
+
+- (void)dealloc
+{
+    [data release];
+	[r1 release];
+	[r2 release];
+	[r3 release];
+	[t1 release];
+	[t2 release];
+	[t3 release];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ addEntry
+// ---------------------------------------------------------------------------------
+// add plot entry on left moving plot forward
+// return plotIndex of entry we added
+- (int)addEntry:(PSPlotEntry *)entry
+{
+    PSPlotEntry* oldEntry;
+    BOOL updateScale = NO;
+    
+    // testing
+    if (false) {
+        u_long value;
+        value = (1 << (plotCount/2)) + plotCount%2;
+        [entry setSent:value];
+        [entry setReceived:value];
+        [entry setDuplicate:value<<1];
+        [entry setRetransmit:value>>1];
+    }
+    
+    // keep one minute (60 seconds) of plot data (0-59 oldest)
+    while ([data count] > 60) {
+        oldEntry = [data objectAtIndex:[data count]-1];
+        if ([oldEntry maxR] >= scaleMax) updateScale = YES;
+        if ([oldEntry maxT] >= scaleMax) updateScale = YES;
+        [data removeObjectAtIndex:[data count]-1];
+    }
+    [data insertObject:entry atIndex:0];
+    if ([entry maxR] > scaleMax) updateScale = YES;
+    if ([entry maxT] > scaleMax) updateScale = YES;
+    plotCount += 1;
+    // update scale if needed
+    if (updateScale) {
+        [self findMax];
+        [self updateScale];
+    }
+    [self setNeedsDisplay:YES];
+	return 0;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ addEntryBack
+// ---------------------------------------------------------------------------------
+// add plot entry on right moving plot backward
+// return plotIndex of entry added
+- (int)addEntryBack:(PSPlotEntry *)entry
+{
+    PSPlotEntry* oldEntry;
+    BOOL updateScale = NO;
+    
+    // testing
+    if (false) {
+        u_long value;
+        value = (1 << (plotCount/2)) + plotCount%2;
+        [entry setSent:value];
+        [entry setReceived:value];
+        [entry setDuplicate:value<<1];
+        [entry setRetransmit:value>>1];
+    }
+    
+    // keep one minute (60 seconds) of plot data (0-59 oldest)
+	if ([data count] < 60) {
+		PSPlotEntry* zeroEntry = [[[PSPlotEntry alloc] init] autorelease];
+		while ([data count] < 60) {
+			[data addObject:zeroEntry]; 
+		}
+	}
+	oldEntry = [data objectAtIndex:0];
+	if ([oldEntry maxR] >= scaleMax) updateScale = YES;
+	if ([oldEntry maxT] >= scaleMax) updateScale = YES;
+	[data removeObjectAtIndex:0];
+
+    [data addObject:entry];
+    if ([entry maxR] > scaleMax) updateScale = YES;
+    if ([entry maxT] > scaleMax) updateScale = YES;
+    plotCount -= 1;
+    // update scale if needed
+    if (updateScale) {
+        [self findMax];
+        [self updateScale];
+    }
+    [self setNeedsDisplay:YES];
+	return ([data count] - 1);
+}
+
+// overwrite plot entry at index
+- (void)setEntry:(PSPlotEntry *)entry atIndex:(unsigned)index
+{
+    PSPlotEntry* oldEntry;
+    BOOL updateScale = NO;
+    
+	do {
+		// index in valid range?
+		if (index > 60) break;
+		// fill in empty if needed
+		if (index > [data count]-1) {
+			PSPlotEntry* zeroEntry = [[[PSPlotEntry alloc] init] autorelease];
+			while ([data count] <= 60) {
+				[data addObject:zeroEntry]; 
+			}
+		}
+		if ([data count] > index) {
+			// examine previous entry to update scale if needed
+			oldEntry = [data objectAtIndex:index];
+			if ([oldEntry maxR] >= scaleMax) updateScale = YES;
+			if ([oldEntry maxT] >= scaleMax) updateScale = YES;
+			// replace with new entry
+			[data replaceObjectAtIndex:index withObject:entry];
+		}
+		else [data addObject:entry];
+		if ([entry maxR] > scaleMax) updateScale = YES;
+		if ([entry maxT] > scaleMax) updateScale = YES;
+		// update scale if needed
+		if (updateScale) {
+			[self findMax];
+			[self updateScale];
+		}
+		[self setNeedsDisplay:YES];
+	} while (false);
+}
+
+- (void)drawRect:(NSRect)rect
+{
+    [self plotBackground];
+    [self plotData];
+}
+
+- (void)plotData
+{
+    PSPlotEntry* entry;
+    int i;
+    NSRect content;
+    NSRect mark;
+    
+    content = NSInsetRect([self bounds], 4, 4);
+    
+    for (i=0; i<[data count]; i++) {
+        entry = [data objectAtIndex:i];
+        if (([entry maxR] + [entry maxT]) == 0) continue;	// skip if nothing to draw
+        mark.origin.x = NSMaxX(content) - (i * 2) - 2;
+        mark.size.width = 2;
+        
+        // receive above
+        // taller first, then overlay shorter
+        if (([entry received] > [entry duplicate]) &&
+            ([entry received] > [entry receivedControl])) {
+            if ([entry duplicate] > [entry receivedControl]) {
+                // received, duplicate, receivedControl
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+                
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+            }
+            else {
+                // received, receivedControl, duplicate
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+                
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+            }
+        }
+        else if (([entry duplicate] >= [entry received]) &&
+            ([entry duplicate] >= [entry receivedControl])) {
+            if ([entry received] > [entry receivedControl]) {
+                // duplicate, received, receivedControl
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+                
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+            }
+            else {
+                // duplicate, receivedControl, received                
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+                
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+            }
+        }
+        else if (([entry receivedControl] >= [entry received]) &&
+            ([entry receivedControl] >= [entry duplicate])) {
+            if ([entry received] > [entry duplicate]) {
+                // receivedControl, received, duplicate                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+                
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+                
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+            }
+            else {
+                // receivedControl, duplicate, received                
+                [r3 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry receivedControl]];         
+                NSRectFill(mark);
+                
+                [r2 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry duplicate]];         
+                NSRectFill(mark);
+                
+                [r1 set];
+                mark.origin.y = NSMidY(content);
+                mark.size.height = [self barHeightForValue:[entry received]];
+                NSRectFill(mark);
+            }
+        }
+ #if 0
+        // received average
+        [[NSColor purpleColor] set];
+        mark.origin.y = NSMidY(content) + [self barHeightForValue:[entry receivedAverage]] - 1;
+        mark.size.height = 1;
+        NSRectFill(mark);
+ #endif       
+        // transmit below
+        // taller first, then overlay shorter
+        if (([entry sent] > [entry retransmit]) &&
+            ([entry sent] > [entry sentControl])) {
+            if ([entry retransmit] > [entry sentControl]) {
+                // sent, retransmit, sentControl                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+            }
+            else {
+                // sent, sentControl, retransmit                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+            }
+        }
+        else if (([entry retransmit] >= [entry sent]) &&
+            ([entry retransmit] >= [entry sentControl])) {
+            if ([entry sent] > [entry sentControl]) {
+                // retransmit, sent, sentControl                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+            }
+            else {
+                // retransmit, sentControl, sent                                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+            }
+        }
+        else if (([entry sentControl] >= [entry sent]) &&
+            ([entry sentControl] >= [entry retransmit])) {
+            if ([entry sent] > [entry retransmit]) {
+                // sentControl, sent, retransmit                                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+            }
+            else {
+                // sentControl, retransmit, sent                                
+                mark.origin.y = NSMidY(content)-1;
+                [t3 set];
+                mark.size.height = [self barHeightForValue:[entry sentControl]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t2 set];
+                mark.size.height = [self barHeightForValue:[entry retransmit]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);  
+                
+                mark.origin.y = NSMidY(content)-1;
+                [t1 set];
+                mark.size.height = [self barHeightForValue:[entry sent]];
+                mark.origin.y -= mark.size.height;
+                NSRectFill(mark);
+            }
+        }
+ #if 0
+        // sent average
+        [[NSColor purpleColor] set];
+        mark.origin.y = NSMidY(content) - [self barHeightForValue:[entry sentAverage]];
+        mark.size.height = 1;
+        NSRectFill(mark);
+ #endif       
+    }	// end for each data sample
+}
+
+- (float)barHeightForValue:(u_long)value
+{
+    int returnValue;
+    int i;
+    float n, d;
+    float fraction;
+
+    if (useLinearScale) {
+        returnValue = value >> shiftCount;
+    }
+    else {
+        // find left bit 1=LSB, 32=MSB
+        for (i=0; i<=32; i++) if ((value >> i) == 0) break;
+        // calculate fraction of increment
+            // strip left bit
+        n = value ^ (1 << (i-1));
+        d = 1 << (i-1);
+        fraction = n/d;
+        
+        returnValue = (i + fraction) * scaleFactor;
+    }
+    return returnValue;
+}
+
+- (NSString *)legendForValue:(u_long)value
+{
+    NSString* returnValue;
+    
+    if (value > 4194304) returnValue = [NSString stringWithFormat:@"%dM",value/1048576];
+    else if (value > 4096) returnValue = [NSString stringWithFormat:@"%dK",value/1024];
+    else returnValue = [NSString stringWithFormat:@"%d",value];
+    return returnValue;
+}
+
+- (void)setLinearScale:(BOOL)value
+{
+    useLinearScale = value;
+    [self setNeedsDisplay:YES];
+}
+
+- (void)updateScale
+{
+    NSString* str;
+    u_int i;
+    u_long top;
+    u_long mid;
+
+    if (useLinearScale) {
+        int maxBar;
+        scaleFactor = 8;
+        maxBar = scaleMax;
+        shiftCount = 0;
+        while (maxBar > 64) {
+            maxBar >>= 1;
+            shiftCount += 1;
+        }
+        top = 64 << shiftCount;
+        mid = top/2;
+    }
+    else {
+        // find left bit 1=LSB, 32=MSB
+        for (i=0; i<=32; i++) if ((scaleMax >> i) == 0) break;
+        if (i < 5) i = 5;	// minimum for scale legends
+        scaleFactor = (float)64.0/(i+1);		// pixels/increment
+        top = 1 << i;
+        mid = 1 << (i>>1);
+    }
+    str = [self legendForValue:top];
+    [scaleTopR setStringValue:str];
+    [scaleTopT setStringValue:str];
+    str = [self legendForValue:mid];
+    [scaleMidR setStringValue:str];
+    [scaleMidT setStringValue:str];
+}
+
+- (void)findMax
+{
+    NSEnumerator* en;
+    PSPlotEntry* entry;
+    u_long max;
+    
+    scaleMax = 0;
+    en = [data objectEnumerator];
+    while (entry = [en nextObject]) {
+        max = [entry maxR];
+        if (max > scaleMax) scaleMax = max;
+        max = [entry maxT];
+        if (max > scaleMax) scaleMax = max;
+    }
+}
+
+// return scaleMax
+- (u_long)scaleMax { return scaleMax; }
+
+- (void)plotBackground
+{
+    NSRect myBounds = [self bounds];
+    NSRect border;
+    NSRect content;
+    NSRect mark;
+    int offset;
+    
+    // paint background
+    [[NSColor whiteColor] set];
+    NSRectFill(myBounds);
+    // draw plot outline
+    [[NSColor blackColor] set];
+    border = NSInsetRect(myBounds, 3, 3);
+    content = NSInsetRect(border, 1, 1);
+    NSFrameRectWithWidth(border, 1);
+    // axis marks
+    mark.size.width = 3;
+    mark.size.height = 1;
+        // left
+    mark.origin.x = NSMinX(border)-3;
+    mark.origin.y = NSMidY(content)-1;
+    offset = 0;
+    while (mark.origin.y <= NSMaxY(border)) {
+        if ((scaleFactor < 6) && (offset % 4)) {
+            mark.size.width = 1;
+            mark.origin.x = NSMinX(border)-1;
+            NSRectFill(mark);
+            mark.size.width = 3;
+            mark.origin.x = NSMinX(border)-3;
+        }
+        else NSRectFill(mark);
+        mark.origin.y += scaleFactor;
+        mark.origin.y += scaleFactor;
+        offset += 1;
+    }
+    mark.origin.y = NSMidY(content)-1;
+    offset = 0;
+    while (mark.origin.y >= NSMinY(border)) {
+        if ((scaleFactor < 6) && (offset % 4)) {
+            mark.size.width = 1;
+            mark.origin.x = NSMinX(border)-1;
+            NSRectFill(mark);
+            mark.size.width = 3;
+            mark.origin.x = NSMinX(border)-3;
+        }
+        else NSRectFill(mark);
+        mark.origin.y -= scaleFactor;
+        mark.origin.y -= scaleFactor;
+        offset += 1;
+    }
+        // right
+    mark.origin.x = NSMaxX(border);
+    mark.origin.y = NSMidY(content)-1;
+    offset = 0;
+    while (mark.origin.y <= NSMaxY(border)) {
+        if ((scaleFactor < 6) && (offset % 4)) {
+            mark.size.width = 1;
+            NSRectFill(mark);
+            mark.size.width = 3;
+        }
+        else NSRectFill(mark);
+        mark.origin.y += scaleFactor;
+        mark.origin.y += scaleFactor;
+        offset += 1;
+    }
+    mark.origin.y = NSMidY(content)-1;
+    offset = 0;
+    while (mark.origin.y >= NSMinY(border)) {
+        if ((scaleFactor < 6) && (offset % 4)) {
+            mark.size.width = 1;
+            NSRectFill(mark);
+            mark.size.width = 3;
+        }
+        else NSRectFill(mark);
+        mark.origin.y -= scaleFactor;
+        mark.origin.y -= scaleFactor;
+        offset += 1;
+    }
+        // top
+    mark.origin.y = NSMaxY(border);
+    mark.size.width = 1;
+    mark.size.height = 2;
+    offset = (plotCount % 10) *2;
+    mark.origin.x = NSMinX(content)+20 - offset;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    if (offset != 0) NSRectFill(mark);
+        // bottom
+    mark.origin.y = NSMinY(border)-2;
+    mark.origin.x = NSMinX(content)+20 - offset;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    if (offset != 0) NSRectFill(mark);
+        // center rule (horizontal)
+    [[NSColor lightGrayColor] set];
+    mark.origin.x = NSMinX(content);
+    mark.origin.y = NSMidY(content)-1;
+    mark.size.width = 122;
+    mark.size.height = 1;
+    NSRectFill(mark);
+/*
+    // grid
+    [[NSColor lightGrayColor] set];
+        // horizontal
+    mark.origin.x = NSMinX(content);
+    mark.origin.y = NSMinY(content)+31;
+    mark.size.width = 120;
+    mark.size.height = 1;
+    NSRectFill(mark);
+    mark.origin.y += 32;
+    NSRectFill(mark);
+    mark.origin.y += 32;
+    NSRectFill(mark);
+        // vertical
+    offset = plotCount % 20;
+    mark.origin.x = NSMinX(content)+20 - offset;
+    mark.origin.y = NSMinY(content);
+    mark.size.width = 1;
+    mark.size.height = 128;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    NSRectFill(mark);
+    mark.origin.x += 20;
+    if (offset != 0) NSRectFill(mark);
+*/
+}
+
+@end

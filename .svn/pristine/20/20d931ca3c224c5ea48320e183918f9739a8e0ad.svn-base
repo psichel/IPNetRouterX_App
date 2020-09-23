@@ -1,0 +1,38 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {scan = id; selectProtocol = id; selectService = id; selectType = id; }; 
+            CLASS = AddressScanWindowC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                aveInfo = NSTextField; 
+                listAll = NSButton; 
+                lostInfo = NSTextField; 
+                maxInfo = NSTextField; 
+                minInfo = NSTextField; 
+                receivedInfo = NSTextField; 
+                scanButton = NSButton; 
+                scanProtocol = NSPopUpButton; 
+                scanType = NSPopUpButton; 
+                scrollView = NSScrollView; 
+                seenInfo = NSTextField; 
+                selectServicePopUp = NSPopUpButton; 
+                sentInfo = NSTextField; 
+                startTime = NSTextField; 
+                statusInfo = NSTextField; 
+                tableView = NSTableView; 
+                targetField = NSComboBox; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = PSArrayTable; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {CLASS = PingData; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

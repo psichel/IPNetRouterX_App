@@ -1,0 +1,18 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {accept = id; doNotAccept = id; help = id; }; 
+            CLASS = DemoController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                expirationDate = id; 
+                expirationText = id; 
+                licenseText = id; 
+                registrationData = id; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

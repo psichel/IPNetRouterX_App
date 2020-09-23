@@ -1,0 +1,202 @@
+//
+//  AlternateRouteEntry.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on Wed Jan 3 2007.
+//  Copyright (c) 2007 Sustainable Softworks, Inc. All rights reserved.
+//
+
+#import "AlternateRouteEntry.h"
+#import "IPValue.h"
+#import "IPSupport.h"
+#import "HardwareAddress.h"
+#import "SystemConfiguration.h"
+
+
+@implementation AlternateRouteEntry
+
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init
+{
+    if (self = [super init]) {
+        // initialize our instance variables
+        nodeDictionary = [[NSMutableDictionary alloc] initWithCapacity:10];
+		[nodeDictionary setObject:[NSNumber numberWithInt:1] forKey:AR_enabled];
+        if (!nodeDictionary) return nil;
+    }
+    return self;
+}
+// ---------------------------------------------------------------------------------
+//	¥ dealloc
+// ---------------------------------------------------------------------------------
+- (void) dealloc {
+    [nodeDictionary release]; nodeDictionary = nil;
+    [super dealloc];
+}
+
+// Access node dictionary
+- (NSMutableDictionary *)nodeDictionary { return nodeDictionary; };
+- (void)setNodeDictionary:(NSMutableDictionary *)value {
+    [value retain];
+    [nodeDictionary release];
+    nodeDictionary = value;
+	// default for enabled
+	if (![nodeDictionary objectForKey:AR_enabled])
+		[nodeDictionary setObject:[NSNumber numberWithInt:1] forKey:AR_enabled];
+}
+
++ (AlternateRouteEntry *)entryFromDictionary:(NSDictionary *)entryDictionary {
+	AlternateRouteEntry* routeE;
+	routeE = [[[AlternateRouteEntry alloc] init] autorelease];
+	[routeE setNodeDictionary:[NSMutableDictionary dictionaryWithDictionary:entryDictionary]];
+	return routeE;
+}
+
+- (NSString *)description {
+	return [NSString stringWithFormat:@"enabled=%@ interface=%@ gatewayIP=%@ gatewayHA=%@ comment=%@",
+		[nodeDictionary objectForKey:AR_enabled],
+		[nodeDictionary objectForKey:AR_interface],
+		[nodeDictionary objectForKey:AR_gatewayIP],
+		[nodeDictionary objectForKey:AR_gatewayHA],
+		[nodeDictionary objectForKey:AR_comment]
+		];
+}
+
+#if 0
+// ---------------------------------------------------------------------------------
+//	¥ objectSpecifier
+// ---------------------------------------------------------------------------------
+// Apparent Compare uses IP Address, port range, protocol
+- (NSScriptObjectSpecifier *)objectSpecifier {
+	NSScriptClassDescription *containerClassDesc = (NSScriptClassDescription *)
+		[NSScriptClassDescription classDescriptionForClass:[NSApp class]];
+
+	NSString* uniqueID = [NSString stringWithFormat:@"address=%@;port=%@;protocol=%@",
+		[self gatewayIP],[self gatewayHA],[self protocol]];
+	return [[[NSUniqueIDSpecifier alloc] 
+		initWithContainerClassDescription:containerClassDesc
+		containerSpecifier:nil key:@"alternateRoutes"
+		uniqueID:uniqueID] autorelease];
+}
+#endif
+
+#pragma mark --- Accessors ---
+- (NSNumber *)enabled { return [nodeDictionary objectForKey:AR_enabled]; }
+- (void)setEnabled:(NSNumber *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_enabled];
+    else [nodeDictionary removeObjectForKey:AR_enabled];
+}
+
+- (NSString *)interface { return [nodeDictionary objectForKey:AR_interface]; }
+- (void)setInterface:(NSString *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_interface];
+    else [nodeDictionary removeObjectForKey:AR_interface];
+}
+
+- (NSString *)gatewayIP { return [nodeDictionary objectForKey:AR_gatewayIP]; }
+- (void)setGatewayIP:(NSString *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_gatewayIP];
+    else [nodeDictionary removeObjectForKey:AR_gatewayIP];
+}
+
+- (NSString *)gatewayHA { return [nodeDictionary objectForKey:AR_gatewayHA]; }
+- (void)setGatewayHA:(NSString *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_gatewayHA];
+    else [nodeDictionary removeObjectForKey:AR_gatewayHA];
+}
+
+- (NSNumber *)activeConnections { return [nodeDictionary objectForKey:AR_activeConnections]; }
+- (void)setActiveConnections:(NSNumber *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_activeConnections];
+    else [nodeDictionary removeObjectForKey:AR_activeConnections];
+}
+
+- (NSNumber *)failedConnections { return [nodeDictionary objectForKey:AR_failedConnections]; }
+- (void)setFailedConnections:(NSNumber *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_failedConnections];
+    else [nodeDictionary removeObjectForKey:AR_failedConnections];
+}
+
+- (NSString *)comment { return [nodeDictionary objectForKey:AR_comment]; }
+- (void)setComment:(NSString *)value {
+    if (value) [nodeDictionary setObject:value forKey:AR_comment];
+    else [nodeDictionary removeObjectForKey:AR_comment];
+}
+
+#pragma mark -- coding and copying --
+// <NSCoding>
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeObject:nodeDictionary];
+    return;
+}
+
+- (id)initWithCoder:(NSCoder *)coder
+{
+    self = [super init];
+	nodeDictionary = [[coder decodeObject] retain];
+    return self;
+}
+
+// tell the PortCoder not to use a proxy
+- (id)replacementObjectForPortCoder:(NSPortCoder *)encoder {
+    return self;
+}
+
+
+// <NSCopying>
+- (id)copyWithZone:(NSZone *)zone {
+    AlternateRouteEntry *copy;
+    copy = [[AlternateRouteEntry allocWithZone:zone] init];
+    [copy setNodeDictionary:nodeDictionary];
+    return copy;
+}
+@end
+
+#pragma mark --- CONVERSION ---
+// convert between data and object form
+int alternateRouteObjectToData(AlternateRouteEntry* routeE, KFT_routeEntry_t* outData)
+{
+	int returnValue = -1;	// no entry
+	
+	if (routeE) {
+		// initialize result
+		bzero(outData, sizeof(KFT_routeEntry_t));
+		// interface (bsdName if any)
+		if ([[routeE interface] length]) {
+			NSString* bsdName = bsdNameForTitle([routeE interface]);
+			[bsdName getCString:outData->bsdName maxLength:kBSDNameLength encoding:NSUTF8StringEncoding];
+		}
+		else outData->bsdName[0] = 0;
+		// gatewayIP
+		outData->gatewayIP = ipForString([routeE gatewayIP]);
+		// gatewayHA
+		eaForString([routeE gatewayHA], (EthernetAddress_t*)&outData->gatewayHA[0]);
+		returnValue = 0;
+	}
+	return returnValue;
+}
+
+AlternateRouteEntry* alternateRouteObjectFromData(KFT_routeEntry_t* inData)
+{
+	AlternateRouteEntry* routeE = nil;
+	
+	routeE = [[[AlternateRouteEntry alloc] init] autorelease];
+	// enabled
+	[routeE setEnabled:[NSNumber numberWithInt:1]];
+	// interface
+	if (inData->bsdName[0]) [routeE setInterface:[NSString stringWithCString:inData->bsdName encoding:NSUTF8StringEncoding]];
+	// gatewayIP
+	[routeE setGatewayIP:stringForIP(inData->gatewayIP)];
+	// gatewayHA
+	[routeE setGatewayHA:stringForEA((EthernetAddress_t*)&inData->gatewayHA[0])];
+	// active
+	[routeE setActiveConnections:[NSNumber numberWithInt:inData->activeConnections]];
+	// failed
+	[routeE setFailedConnections:[NSNumber numberWithInt:inData->failedConnections]];
+
+	return routeE;
+}
+

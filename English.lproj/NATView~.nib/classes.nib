@@ -1,0 +1,13 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {myHelp = id; natDelete = id; natRefresh = id; }; 
+            CLASS = NATViewWindowC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {statusInfo = NSTextField; tableView = NSTableView; }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

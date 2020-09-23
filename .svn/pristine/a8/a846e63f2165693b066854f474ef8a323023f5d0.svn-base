@@ -1,0 +1,88 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {
+                defaultLeaseTimeField = id; 
+                dhcpApply = id; 
+                dhcpSave = id; 
+                dhcpServerOn = id; 
+                dhcpShowActive = id; 
+                dhcpUseDefaults = id; 
+                dynamicBootp = id; 
+                dynamicConfigTableDelete = id; 
+                dynamicConfigTableNew = id; 
+                editLeaseOptions = id; 
+                ignoreBootp = id; 
+                leaseGrantedField = id; 
+                leaseNotGrantedField = id; 
+                leaseOptionsTableDelete = id; 
+                leaseOptionsTableNew = id; 
+                leaseTimeUnit = id; 
+                logDrawer = id; 
+                maxLeaseTimeField = id; 
+                myHelp = id; 
+                pingCheck = id; 
+                searchDomainsField = id; 
+                serverOptionsTableDelete = id; 
+                serverOptionsTableNew = id; 
+                staticConfigExport = id; 
+                staticConfigImport = id; 
+                staticConfigTableDelete = id; 
+                staticConfigTableNew = id; 
+                statusTableDelete = id; 
+                statusTableNew = id; 
+                verboseLogging = id; 
+            }; 
+            CLASS = DHCPServerWindowC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                applyButton = NSButton; 
+                defaultLeaseTimeField = NSTextField; 
+                defaultLeaseTimeUnitPopUp = NSPopUpButton; 
+                dhcpOnCheckBox = NSButton; 
+                dhcpServerOn = NSButton; 
+                dynamicBootpCheckBox = NSButton; 
+                dynamicConfigTableDelete = NSButton; 
+                dynamicConfigTableNew = NSButton; 
+                dynamicConfigTableView = NSTableView; 
+                hostNameServerInfo = NSTextField; 
+                ignoreBootpCheckBox = NSButton; 
+                leaseGrantedField = NSTextField; 
+                leaseNotGrantedField = NSTextField; 
+                leaseOptionsTableDelete = NSButton; 
+                leaseOptionsTableNew = NSButton; 
+                leaseOptionsTableView = NSTableView; 
+                leaseStatePopUp = NSPopUpButton; 
+                logDrawer = NSDrawer; 
+                logDrawerButton = NSButton; 
+                logScrollView = NSScrollView; 
+                logTextView = NSTextView; 
+                maxLeaseTimeField = NSTextField; 
+                maxLeaseTimeUnitPopUp = NSPopUpButton; 
+                networkInterfaceCombo = NSComboBox; 
+                pingCheckCheckBox = NSButton; 
+                searchDomainsField = NSTextField; 
+                serverOptionsOptionTypePopUp = NSPopUpButton; 
+                serverOptionsTableDelete = NSButton; 
+                serverOptionsTableNew = NSButton; 
+                serverOptionsTableView = NSTableView; 
+                staticConfigTableDelete = NSButton; 
+                staticConfigTableNew = NSButton; 
+                staticConfigTableView = NSTableView; 
+                statusInfo = NSTextField; 
+                statusTableDelete = NSButton; 
+                statusTableView = NSTableView; 
+                tabView = NSTabView; 
+                verboseLoggingPopUp = NSPopUpButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {"" = id; myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

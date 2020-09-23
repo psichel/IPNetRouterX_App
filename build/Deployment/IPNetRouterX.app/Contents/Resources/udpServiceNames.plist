@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist SYSTEM "file://localhost/System/Library/DTDs/PropertyList.dtd">
+<plist version="0.9">
+<dict>
+	<key>0</key>
+	<string>all ports</string>
+	<key>7</key>
+	<string>Echo</string>
+	<key>9</key>
+	<string>Discard</string>
+	<key>53</key>
+	<string>DNS</string>
+	<key>67</key>
+	<string>DHCP-server</string>
+	<key>68</key>
+	<string>DHCP-client</string>
+	<key>69</key>
+	<string>TFTP</string>
+	<key>123</key>
+	<string>NTP</string>
+	<key>137</key>
+	<string>Windows Name Service (UDP)</string>
+	<key>138</key>
+	<string>Windows Network Neighborhood (UDP)</string>
+	<key>139</key>
+	<string>Windows File Sharing (netbios+SMB)</string>
+	<key>161</key>
+	<string>SNMP</string>
+	<key>162</key>
+	<string>snmptrap</string>
+	<key>179</key>
+	<string>bgp</string>
+	<key>407</key>
+	<string>Timbuktu</string>
+	<key>427</key>
+	<string>SLP</string>
+	<key>458</key>
+	<string>QuickTime TV</string>
+	<key>497</key>
+	<string>Retrospect</string>
+	<key>514</key>
+	<string>Syslog</string>
+	<key>554</key>
+	<string>RTSP</string>
+	<key>2049</key>
+	<string>NFS</string>
+	<key>3283</key>
+	<string>ANAT</string>
+	<key>5003</key>
+	<string>FileMaker Pro</string>
+	<key>5353</key>
+	<string>mDNS</string>
+	<key>6970</key>
+	<string>QT + RP</string>
+	<key>7070</key>
+	<string>RTSP alternate</string>
+</dict>
+</plist>

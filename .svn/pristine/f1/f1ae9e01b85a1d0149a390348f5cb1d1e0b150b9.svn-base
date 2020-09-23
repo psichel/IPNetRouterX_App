@@ -1,0 +1,53 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {
+                accountingIntervalPopUp = id; 
+                applyButton = id; 
+                bandwidthAccountingCheckBox = id; 
+                connectionLoggingCheckBox = id; 
+                disableAlertsCheckBox = id; 
+                disableCommandQ = id; 
+                emailBandwidthLogCB = id; 
+                emailConnectionLogCB = id; 
+                emailDHCPLogCB = id; 
+                emailSecurityLogCB = id; 
+                emailTestButton = id; 
+                emailToField = id; 
+                logFormatPopUp = id; 
+                logUpdateIntervalPopUp = id; 
+                saveToCheckBox = id; 
+                setAppleScriptButton = id; 
+                updateLogsNowButton = id; 
+                writeIntervalCheckBox = id; 
+            }; 
+            CLASS = PreferencesController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                accountingIntervalPopUp = NSPopUpButton; 
+                appleScriptFileField = NSTextField; 
+                bandwidthAccountingCheckBox = NSButton; 
+                connectionLoggingCheckBox = NSButton; 
+                disableAlertsCheckBox = NSButton; 
+                disableCommandQ = NSButton; 
+                emailAddressField = NSTextField; 
+                emailBandwidthLogCheckBox = NSButton; 
+                emailConnectionLogCheckBox = NSButton; 
+                emailDHCPLogCheckBox = NSButton; 
+                emailSecurityLogCheckBox = NSButton; 
+                emailTestButton = NSButton; 
+                emailToField = NSTextField; 
+                logFormatPopUp = NSPopUpButton; 
+                logUpdateIntervalPopUp = NSPopUpButton; 
+                realNameField = NSTextField; 
+                saveToCheckBox = NSButton; 
+                smtpHostField = NSTextField; 
+                tabView = NSTabView; 
+                writeIntervalCheckBox = NSButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

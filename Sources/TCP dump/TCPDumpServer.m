@@ -1,0 +1,216 @@
+//
+//  TCPDumpServer.m
+//  IPNetMonitorX
+//
+//  Created by psichel on Wed Jan 12 2002.
+//  Copyright (c) 2002 Sustainable Softworks. All rights reserved.
+//
+//  Encapsulates performing tcpdump in a separate thread.
+//  We use a Distributed Objects (DO) server design to synchronize
+//  with the main AppKit UI thread.
+#import "TCPDumpServer.h"
+#import "IPHost.h"
+#import "PSURL.h"
+#import "PseudoTTY.h"
+#import "IPSupport.h"
+#import "AppSupport.h"
+#import "unp.h"
+
+@implementation TCPDumpServer
+
+// -- Thread Server Interface --
+- (oneway void)startService:(NSString *)inURL fromController:(id)controller withObject:(id)object
+// see comments in PSServerInterface.h
+{
+    PSURL* url = nil;
+    NSString* interfaceName;
+    NSString* server;
+    NSString* optionStr;
+    BOOL debug = NO;
+
+    // The following line is an interesting optimisation.  We tell our proxy
+    // to the controller object about the methods that we're going to
+    // send to the proxy.    
+    [controller setProtocolForProxy:@protocol(ControllerFromThread)];
+    // init method vars
+	[self setController:controller];
+NS_DURING
+    do {
+		if (mFinishFlag) {
+			[self reportError:NSLocalizedString(@"Server is terminating",@"Server is terminating") withCode:0];
+			break;
+		}
+		// extract lookup parameters
+        // <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
+        // tcpdump://interface@server
+        url = [[PSURL alloc] init];
+        [url setStringValue:inURL];
+        if ([[url name] length] == 0) {
+            interfaceName = [url  host];
+            server = @"";
+        }
+        else {
+            interfaceName = [url name];
+            server = [url host];
+        }
+        optionStr = [url paramValueForKey:@"options"];
+        // show what we got
+        if (debug) {
+            [self appendString:[NSString stringWithFormat:
+                @"scheme=%@",[url scheme]] newLine:YES];
+            [self appendString:[NSString stringWithFormat:
+                @"name=%@",interfaceName] newLine:YES];
+            [self appendString:[NSString stringWithFormat:
+                @"server=%@",server] newLine:YES];
+        }
+        if ([server length] == 0) {
+            [self updateParameter:@"statusInfo" withObject:NSLocalizedString(@"using default server",@"using default server")];
+        }
+        // run tcpDump or tcpFlow command line tool and display results
+        if ([[url scheme] isEqualTo:@"tcpdump"]) [self doTCPDump:interfaceName withOptions:optionStr];
+		else if ([[url scheme] isEqualTo:@"tcpflow"]) [self doTCPFlow:interfaceName withOptions:optionStr];
+		else {
+			[self updateParameter:@"statusInfo" withObject:NSLocalizedString(@"Target not recognized",@"Target not recognized")];
+            break;
+		}
+        [self appendString:@"----------------[End of response]----------------\n" newLine:YES];
+    } while (false);
+NS_HANDLER
+	NSString* statusInfo = @"Exception during TCPDumpServer.m -startService";
+	NSLog(@"%@",statusInfo);
+	[self updateParameter:@"statusInfo" withObject:statusInfo];
+	if (inURL) NSLog(@"%@",inURL);
+NS_ENDHANDLER
+    [self finish];
+    [url release];
+}
+
+// run a unix command line tool and call outputData to dump its data
+- (void)doTCPDump:(NSString*)interfaceName withOptions:(NSString*)optionStr
+{
+    int result;
+	NSString* path;
+	BOOL fileExists;
+    NSMutableArray *args;
+    NSData* data = nil;
+    NSTask* task = nil;
+    NSPipe* standardOutputPipe = [NSPipe pipe];
+    NSFileHandle* standardOutputHandle = [standardOutputPipe fileHandleForReading];
+    [standardOutputPipe retain];
+    [standardOutputHandle retain];
+    // setup to run tool
+	path = [AppSupport toolPathForName:@"RunTCPDump" fileExists:&fileExists];
+	if (!fileExists) {
+		NSLog(@"Helper tool RunTCPDump was not found at path: %@", path);
+		return;
+	}
+	args = [NSMutableArray arrayWithObjects:@"-l",@"-i",interfaceName, nil];
+    if (optionStr) [args addObjectsFromArray:[optionStr componentsSeparatedByString:@" "]];
+NS_DURING
+    // create a task to run a unix tool and capture the output
+    task = [[NSTask alloc] init];
+    [task setStandardOutput:standardOutputPipe];
+    [task setLaunchPath:path];
+    [task setArguments:args];
+    [task launch];
+    // pass pid to controller
+    [self updateParameter:@"processIdentifier" withObject:[NSString
+        stringWithFormat:@"%d",[task processIdentifier]]];
+    while ([task isRunning]) {
+        // check for abort
+        if ([self didUserAbort]) {
+            [task interrupt];
+            break;
+        }
+        // block waiting for data if any
+		data = nil;
+        result = readFileHandle(standardOutputHandle, &data);
+        if ([data length] != 0) [self outputData:data];
+    }
+NS_HANDLER
+	NSRunAlertPanel(@"IPNetMonitorX",
+		@"For security reasons, tcpdump is not authorized for users outside the admin group.  You will need Mac OS X administrator privileges to use this tool.",
+		@"OK",
+		nil,
+		nil);
+NS_ENDHANDLER
+    [task terminate];	// make sure task is terminated
+	[task autorelease];
+	[self updateParameter:@"statusInfo" withObject:NSLocalizedString(@"TCPDump completed",@"TCPDump completed")];
+}
+
+// run a unix command line tool and call outputData to dump its data
+- (void)doTCPFlow:(NSString*)interfaceName withOptions:(NSString*)optionStr
+{
+    int result;
+	NSString* path;
+	BOOL fileExists;
+    NSMutableArray *args;
+    NSData* data = nil;
+    NSTask* task = nil;
+	PseudoTTY* pty;
+	pty = [[PseudoTTY alloc] init];
+    // setup to run tool
+	path = [AppSupport toolPathForName:@"RunTCPFlow" fileExists:&fileExists];
+	if (!fileExists) {
+		NSLog(@"Helper tool RunTCPFlow was not found at path: %@", path);
+		return;
+	}
+	args = [NSMutableArray arrayWithObjects:@"-c",@"-i",interfaceName, nil];
+    if (optionStr) [args addObjectsFromArray:[optionStr componentsSeparatedByString:@" "]];
+NS_DURING    
+	// create a task to run a unix tool and capture the output
+    task = [[NSTask alloc] init];
+	[task setStandardOutput:[pty slaveFileHandle]];
+    [task setLaunchPath:path];
+    [task setArguments:args];
+    [task launch];
+    // pass pid to controller
+    [self updateParameter:@"processIdentifier" withObject:[NSString
+        stringWithFormat:@"%d",[task processIdentifier]]];
+    [self updateParameter:@"fileDescriptor" withObject:[NSString
+        stringWithFormat:@"%d",[[pty slaveFileHandle] fileDescriptor]]];
+    while ([task isRunning]) {
+        // check for abort
+        if ([self didUserAbort]) {
+            [task interrupt];
+            break;
+        }
+        // block waiting for data if any
+		data = nil;
+        result = readFileHandle([pty masterFileHandle], &data);
+        if ([data length] != 0) [self outputData:data];
+    }
+NS_HANDLER
+	NSRunAlertPanel(@"IPNetMonitorX",
+		@"For security reasons, tcpflow is not authorized for users outside the admin group.  You will need Mac OS X administrator privileges to use this tool.",
+		@"OK",
+		nil,
+		nil);
+NS_ENDHANDLER    
+	[task terminate];	// make sure task is terminated
+	[task autorelease];
+	[pty release];
+	[self updateParameter:@"statusInfo" withObject:NSLocalizedString(@"TCPFlow completed",@"TCPFlow completed")];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ outputData:
+// ---------------------------------------------------------------------------------
+- (void)outputData:(NSData *)data
+{
+    NSString* str;
+    str = [[NSString alloc]initWithData:data
+        encoding:NSUTF8StringEncoding];
+    [self updateParameter:@"outputText" withObject:str];
+    [str release];
+}
+
+- (void)appendString:(NSString *)inString newLine:(BOOL)newLine
+{
+    [self updateParameter:@"outputText" withObject:inString];
+    if (newLine)
+        [self updateParameter:@"outputText" withObject:@"\n"];
+}
+
+@end

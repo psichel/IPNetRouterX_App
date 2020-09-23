@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>D168953F-8ED4-490B-BFE9-383E0C099F8A</string>
+	<key>IDESourceControlProjectName</key>
+	<string>IPNetRouterX</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>FBA04E16-7B8D-43CC-8892-F6C985B9454C</key>
+		<string>file:///Users/psichel/Repository/IPNetRouterX/IPNetRouterX_App</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>IPNetRouterX.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>FBA04E16-7B8D-43CC-8892-F6C985B9454C</key>
+		<string>../..</string>
+	</dict>
+	<key>IDESourceControlProjectRepositoryRootDictionary</key>
+	<dict>
+		<key>FBA04E16-7B8D-43CC-8892-F6C985B9454C</key>
+		<string>file:///Users/psichel/Repository/IPNetRouterX</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>file:///Users/psichel/Repository/IPNetRouterX/IPNetRouterX_App/IPNetRouterX.xcodeproj</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>110</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>FBA04E16-7B8D-43CC-8892-F6C985B9454C</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.subversion</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>FBA04E16-7B8D-43CC-8892-F6C985B9454C</string>
+			<key>IDESourceControlWCCName</key>
+			<string>IPNetRouterX_App</string>
+		</dict>
+	</array>
+</dict>
+</plist>

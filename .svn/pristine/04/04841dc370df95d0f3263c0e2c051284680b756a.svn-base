@@ -1,0 +1,13 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {Cancel = id; Connect = id; }; 
+            CLASS = ConnectToServer; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {password = NSSecureTextField; server = NSTextField; userName = NSTextField; }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

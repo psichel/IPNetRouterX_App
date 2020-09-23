@@ -1,0 +1,1 @@
+#import <Cocoa/Cocoa.h>#import "PreferencesController.h"@interface PreferencesWindowM : NSObject{}- (IBAction)showWindow:(id)sender;- (unsigned)count;- (int)closeAll;@end

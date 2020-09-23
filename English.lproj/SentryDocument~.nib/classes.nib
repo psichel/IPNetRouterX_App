@@ -1,0 +1,99 @@
+{
+    IBClasses = (
+        {CLASS = FilterTable; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = IPValueFormatter; LANGUAGE = ObjC; SUPERCLASS = NSFormatter; }, 
+        {
+            CLASS = InterfaceTable; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {document = SentryDocument; }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                apply = id; 
+                defaultsButton = id; 
+                delete = id; 
+                excludeNetField = id; 
+                exposedHostField = id; 
+                exposedHostPopUp = id; 
+                firewallOn = id; 
+                interfaceList = id; 
+                ipForwarding = id; 
+                logDrawer = id; 
+                lookupButton = id; 
+                myHelp = id; 
+                new = id; 
+                portMapDelete = id; 
+                portMapLogging = id; 
+                portMapNew = id; 
+                selectParameter = id; 
+                showActive = id; 
+                sourceAwareRouting = id; 
+                testButton = id; 
+                toggleSiblingChild = id; 
+                traceButton = id; 
+                triggerDefaultDuration = id; 
+                triggerDelete = id; 
+                triggerNew = id; 
+                whoisButton = id; 
+            }; 
+            CLASS = SentryDocument; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                actionPopUp = NSPopUpButton; 
+                applyButton = NSButton; 
+                bridgeCheckBox = NSButton; 
+                deleteButton = NSButton; 
+                excludeNetField = NSTextField; 
+                exposedHostField = NSTextField; 
+                exposedHostPopUp = NSPopUpButton; 
+                externalCheckBox = NSButton; 
+                firewallCheckBox = NSButton; 
+                firewallOnCheckBox = NSButton; 
+                interfaceTableView = NSTableView; 
+                ipForwarding = NSButton; 
+                logDrawer = NSDrawer; 
+                logDrawerButton = NSButton; 
+                logScrollView = NSScrollView; 
+                logTextView = NSTextView; 
+                natCheckBox = NSButton; 
+                newButton = NSButton; 
+                outlineViewOutlet = NSOutlineView; 
+                parameterPopUp = NSPopUpButton; 
+                portMapActualPortCombo = NSComboBox; 
+                portMapApparentPortCombo = NSComboBox; 
+                portMapDynamicCombo = NSComboBox; 
+                portMapLogging = NSButton; 
+                portMapOnButton = NSButton; 
+                portMapProtocolCombo = NSComboBox; 
+                portMapTableView = NSTableView; 
+                propertyPopUp = NSPopUpButton; 
+                relationPopUp = NSPopUpButton; 
+                ruleEnabledCheckBox = NSButton; 
+                sourceAwareRouting = NSButton; 
+                statusInfo = NSTextField; 
+                tabView = NSTabView; 
+                toggleSiblingChildButton = NSButton; 
+                triggerDefaultDuration = NSPopUpButton; 
+                triggerDuration = NSPopUpButton; 
+                triggerTableView = NSTableView; 
+                triggerType = NSPopUpButton; 
+                valueComboBox = NSComboBox; 
+            }; 
+            SUPERCLASS = NSDocument; 
+        }, 
+        {
+            CLASS = TriggerTable; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {document = SentryDocument; }; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

@@ -1,0 +1,139 @@
+#import "DemoController.h"
+#import "RegSupport.h"
+#import "PSSupport.h"
+
+@implementation DemoController
+- init
+{
+    if (self = [super init]) {
+        // initialize instance vars
+		date = nil;	// not retained
+    }
+    return self;
+}
+- (void)dealloc
+{
+	// release any vars we allocated
+    [super dealloc];
+}
+- (void)awakeFromNib
+{
+	// Retain ourself so caller can release reference.  Released in windowWillClose:
+	[self retain];	
+}
+
+- (void)windowWillClose:(NSNotification *)aNotification
+{
+    [self autorelease];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ windowDidBecomeKey
+// ---------------------------------------------------------------------------------
+- (void)windowDidBecomeKey:(NSNotification *)aNotification
+{
+	// check for key in Pasteboard
+	if (![[RegSupport sharedInstance] isRegisteredOption:kOptionSkipDialog]) {
+		[[RegSupport sharedInstance] checkPasteboardFromWindow:[self window]];
+		// don't loop if key not accepted, ignore result
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ tryButton
+// ---------------------------------------------------------------------------------
+- (IBAction)tryButton:(id)sender
+{
+    [NSApp stopModal];
+	[self close];
+
+	NSString *regData = [registrationData string];
+    if ([regData length]) [[RegSupport sharedInstance] doRegistrationInput:regData fromWindow:nil option:0];
+    
+	if (![[RegSupport sharedInstance] isRegisteredOption:kOptionSkipDialog]) {
+		if ((date == nil) || ([date timeIntervalSinceNow] < 0)) {
+			// not registered, trial has expired
+			NSRunAlertPanel(PS_PRODUCT_NAME,
+				@"The trial period for this software has expired.  Please <mailto:admin@sustworks.com> if you need additional assistance to evaluate this software.",
+				@"OK",
+				nil,
+				nil);
+			[NSApp terminate:self];
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ buyButton
+// ---------------------------------------------------------------------------------
+- (IBAction)buyButton:(id)sender
+{
+    int result = kRegNotFound;
+	NSString *regData = [registrationData string];
+    if ([regData length]) result = [[RegSupport sharedInstance] doRegistrationInput:regData fromWindow:[self window] option:0];
+	if (result == kRegAccepted) {
+		[NSApp stopModal];
+		[self close];
+	}
+
+	// direct user to registration page
+	NSURL *regURL;
+	if ((regURL = [NSURL URLWithString:@"http://www.sustworks.com/site/reg.html"])) {
+		[[NSWorkspace sharedWorkspace] openURL:regURL];
+	}
+    
+	if (![[RegSupport sharedInstance] isRegisteredOption:0]) {
+		if ((date == nil) || ([date timeIntervalSinceNow] < 0)) {
+			// not registered, trial has expired
+			[NSApp terminate:self];
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ doNotAccept
+// ---------------------------------------------------------------------------------
+- (IBAction)doNotAccept:(id)sender
+{
+    [NSApp stopModal];
+    [self close];
+    [NSApp terminate:self];
+}
+
+
+// ---------------------------------------------------------------------------------
+//	¥ help
+// ---------------------------------------------------------------------------------
+- (IBAction)help:(id)sender {
+    openHelpAnchor(@"NMTitle");
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ setDate
+// ---------------------------------------------------------------------------------
+- (void)setDate:(NSDate *)value
+{
+    date = value;
+    if (date == nil) {
+        [expirationDate setStringValue:NSLocalizedString(
+            @"expiration data not available",@"expiration data not available")];
+        [expirationText setStringValue:NSLocalizedString(
+            @"The trial period for this software has expired.", @"has expired")];
+    }
+    else if ([date timeIntervalSinceNow] < 0) {
+        [expirationDate setStringValue:[date description]];
+        [expirationText setStringValue:NSLocalizedString(
+            @"The trial period for this software expired at: ", @"did expire")];
+    }
+    else {
+        [expirationDate setStringValue:[date description]];
+        [expirationText setStringValue:NSLocalizedString(
+            @"The trial period for this software expires at: ", @"will expire")];
+    }
+}
+@end
+
+// ---------------------------------------------------------------------------------
+//	¥ 
+// ---------------------------------------------------------------------------------
+

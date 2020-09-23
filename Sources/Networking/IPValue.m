@@ -1,0 +1,333 @@
+//
+//  IPValue.m
+//  IPNetMonitorX
+//
+//  Created by psichel on Tue Jun 05 2001.
+//  Copyright (c) 2001 Sustainable Softworks Inc. All rights reserved.
+//
+
+#import "IPValue.h"
+#import "IPValueFormatter.h"
+#if !BUILD_AS_HELPER_TOOL
+#import "PSServiceDictionary.h"
+#endif
+#import <string.h>
+
+@implementation IPValue
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id)init {
+    if (self = [super init]) {
+        bzero(&mIPValue, sizeof(IPValueT));
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ ipAddress
+// ---------------------------------------------------------------------------------
+- (u_int32_t)ipAddress {
+    return mIPValue.start;
+}
+- (void)setIpAddress:(u_int32_t)inValue {
+    mIPValue.start = inValue;
+	mIPValue.type = AF_INET;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ ipAddress6
+// ---------------------------------------------------------------------------------
+- (in6_addr_t *)ipAddress6 {
+    return &mIPValue.start6;
+}
+- (void)setIpAddress6:(in6_addr_t *)inValue {
+    memcpy(&mIPValue.start6, inValue, 16);
+	mIPValue.type = AF_INET6;
+}
+
+#pragma mark -- mask --
+// ---------------------------------------------------------------------------------
+//	¥ mask6
+// ---------------------------------------------------------------------------------
+- (in6_addr_t *)mask6 {
+    return &mIPValue.mask6;
+}
+- (void)setMask6:(in6_addr_t *)inValue {
+	memcpy(&mIPValue.mask6, inValue, 16);
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ hasMask6
+// ---------------------------------------------------------------------------------
+- (BOOL)hasMask6 {
+	BOOL returnValue = NO;
+	int i;
+	for (i=0; i<4; i++) {
+		if (mIPValue.mask6.__u6_addr.__u6_addr32[i] != 0) {
+			returnValue = YES;
+			break;
+		}
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ compareWithMask6
+// ---------------------------------------------------------------------------------
+- (int)compareWithMask6:(in6_addr_t *)inValue {
+	int result = 0;
+	int i;
+	for (i=0; i<16; i++) {
+		result = (mIPValue.start6.s6_addr[i] & mIPValue.mask6.s6_addr[i]) -
+			(inValue->s6_addr[i] & mIPValue.mask6.s6_addr[i]);
+		if (result != 0) break;
+	}
+	return result;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ mask
+// ---------------------------------------------------------------------------------
+// allow access to prefix length in mask format
+- (u_int32_t)mask {
+    return 0xFFFFFFFF << (32 - mIPValue.prefixLen);
+}
+- (void)setMask:(u_int32_t)inValue
+{
+	mIPValue.prefixLen = FindRightBit(inValue, 32);
+}
+
+#pragma mark -- address range --
+// ---------------------------------------------------------------------------------
+//	¥ endAddress
+// ---------------------------------------------------------------------------------
+- (u_int32_t)endAddress {
+    return mIPValue.end;
+}
+- (void)setEndAddress:(u_int32_t)inValue {
+	mIPValue.end = inValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ endAddress6
+// ---------------------------------------------------------------------------------
+- (in6_addr_t *)endAddress6 {
+    return &mIPValue.end6;
+}
+- (void)setEndAddress6:(in6_addr_t *)inValue {
+	memcpy(&mIPValue.end6, inValue, 16);
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ hasEndAddress
+// ---------------------------------------------------------------------------------
+- (BOOL)hasEndAddress {
+	BOOL returnValue = NO;
+	int i;
+	if (mIPValue.type == AF_INET6) {
+		for (i=0; i<4; i++) {
+			if (mIPValue.end6.__u6_addr.__u6_addr32[i] != 0) {
+				returnValue = YES;
+				break;
+			}
+		}
+	}
+	else if (mIPValue.type == AF_INET) {
+		if (mIPValue.end != 0) returnValue = YES;
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ startOfRange
+// ---------------------------------------------------------------------------------
+- (u_int32_t)startOfRange {
+	if (mIPValue.prefixLen == 0) return (mIPValue.start);
+	return (mIPValue.start & [self mask]);
+}
+
+
+// ---------------------------------------------------------------------------------
+//	¥ endOffset
+// ---------------------------------------------------------------------------------
+- (int32_t)endOffset {
+	if (mIPValue.end) {
+		return (mIPValue.end - mIPValue.start);
+	}
+	if ((mIPValue.prefixLen > 0) && (mIPValue.prefixLen <= 32)) {
+		u_int32_t end = mIPValue.start | ~[self mask];
+		return (end - [self startOfRange]); 
+	}
+	return 0;
+}
+
+#pragma mark - other info -
+// ---------------------------------------------------------------------------------
+//	¥ prefixLen
+// ---------------------------------------------------------------------------------
+- (u_int8_t)prefixLen {
+    return mIPValue.prefixLen;
+}
+- (void)setPrefixLen:(u_int8_t)inValue {
+    mIPValue.prefixLen = inValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ type (0=IPv4, 1=IPv6)
+// ---------------------------------------------------------------------------------
+- (u_int8_t)type {
+    return mIPValue.type;
+}
+- (void)setType:(u_int8_t)inValue {
+    mIPValue.type = inValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ segments
+// ---------------------------------------------------------------------------------
+// remember number of address segments when converting from an address string
+- (u_int8_t)segments {
+    return mIPValue.segments;
+}
+- (void)setSegments:(u_int8_t)inValue {
+    mIPValue.segments = inValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ options
+// ---------------------------------------------------------------------------------
+// display options (kOptionCompres, kOptionExpand, kOptionUpper, kOptionLower)
+- (u_int8_t)options {
+    return mIPValue.options;
+}
+- (void)setOptions:(u_int8_t)inValue mask:(u_int8_t)mask {
+    mIPValue.options &= ~mask;
+	mIPValue.options |= (inValue & mask);
+}
+
+#pragma mark -- port range --
+// ---------------------------------------------------------------------------------
+//	¥ startPort
+// ---------------------------------------------------------------------------------
+- (u_int16_t)startPort {
+    return mIPValue.startPort;
+}
+- (void)setStartPort:	(int)inValue {
+    // adjust values out of valid range
+	if (inValue > 0xFFFF) inValue = 0xFFFF;
+	else if (inValue < 0) inValue = 0;
+	mIPValue.startPort = inValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ endPort
+// ---------------------------------------------------------------------------------
+- (u_int16_t)endPort {
+    return mIPValue.endPort;
+}
+- (void)setEndPort:		(int)inValue {
+    // adjust values out of valid range
+	if (inValue > 0xFFFF) inValue = 0xFFFF;
+	else if (inValue < 0) inValue = 0;
+    mIPValue.endPort = inValue;
+}
+
+#pragma mark -- string representation --
+// ---------------------------------------------------------------------------------
+//	¥ stringValue
+// ---------------------------------------------------------------------------------
+- (NSString *)stringValue
+{
+    NSString* returnValue;
+    IPValueFormatter* ipf;
+    ipf = [IPValueFormatter sharedInstance];
+    returnValue = [ipf stringForObjectValue:self];
+    return returnValue;
+}
+- (BOOL)setStringValue:(NSString *)inValue
+{
+    BOOL returnValue;
+	IPValue* ipValue;
+	NSString* errorStr;
+    IPValueFormatter* ipf;
+	
+    ipf = [IPValueFormatter sharedInstance];
+	returnValue = [ipf getObjectValue:&ipValue forString:inValue errorDescription:&errorStr];
+	if (returnValue) {
+		memcpy((void*)[self bytes], (void*)[ipValue bytes], [self length]);
+	}
+	else NSLog(@"%@",errorStr);
+    return returnValue;
+}
+
+#if !BUILD_AS_HELPER_TOOL
+// ---------------------------------------------------------------------------------
+//	¥ stringValueForProtocol
+// ---------------------------------------------------------------------------------
+// return string as x.x.x.x:port (<protocol_name>)
+- (NSString *)stringValueForProtocol:(int)protocol
+{
+    NSString* str = nil;
+    NSString* name;
+	u_int32_t port;
+
+	if ([self type] == AF_INET) {
+		str = stringForIP([self ipAddress]);
+		port = [self startPort];
+		if (port) {
+			str = [str stringByAppendingString:[NSString stringWithFormat:@":%d",port]];
+			name = [[PSServiceDictionary sharedInstance] serviceNameForPort:port protocol:protocol];
+			if (name) str = [str stringByAppendingString:[NSString stringWithFormat:@" (%@)", name]];
+		}
+	}
+	else if ([self type] == AF_INET6) {
+		str = stringForIP6([self ipAddress6], [self options]);
+		port = [self startPort];
+		if (port) {
+			str = [str stringByAppendingString:[NSString stringWithFormat:@".%d",port]];
+			name = [[PSServiceDictionary sharedInstance] serviceNameForPort:port protocol:protocol];
+			if (name) str = [str stringByAppendingString:[NSString stringWithFormat:@" (%@)", name]];
+		}
+
+	}
+    return str;
+}
+#endif
+
+// ---------------------------------------------------------------------------------
+//	¥ bsdName
+// ---------------------------------------------------------------------------------
+// interface name for IPv6 multicast %en0
+- (NSString *)bsdName {
+	return [NSString stringWithCString:mIPValue.bsdName encoding:NSUTF8StringEncoding];
+	//return [NSString stringWithCString:mIPValue.bsdName encoding:NSUTF8StringEncoding];
+}
+- (void)setBsdName:(NSString *)value {
+	if (!value) mIPValue.bsdName[0] = 0;
+	//else [value getCString:&mIPValue.bsdName[0] maxLength:kBSDNameLength];
+	else [value getCString:&mIPValue.bsdName[0] maxLength:kBSDNameLength encoding:NSUTF8StringEncoding];
+}
+
+#pragma mark -- copying --
+// <NSCopying>
+- (const void *)bytes {
+    return &mIPValue;
+}
+
+- (unsigned)length {
+    return sizeof(IPValueT);
+}
+
+- (NSString *)description {
+    return [self stringValue];
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+    IPValue *copy;
+    copy = [[IPValue allocWithZone:zone] init];
+    //[copy setIPValue:&mIPValue];
+    memcpy((void*)[copy bytes], &mIPValue, [self length]);
+    return copy;
+}
+@end

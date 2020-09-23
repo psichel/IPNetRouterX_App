@@ -1,0 +1,26 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = IPValueFormatter; LANGUAGE = ObjC; SUPERCLASS = NSFormatter; }, 
+        {
+            ACTIONS = {flushcache = id; lookup = id; myHelp = id; }; 
+            CLASS = LookupController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                elapsedInfo = NSTextField; 
+                lookupField = NSComboBox; 
+                resultField = NSTextField; 
+                statusInfo = NSTextField; 
+                testButton = NSButton; 
+                verificationField = NSTextField; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

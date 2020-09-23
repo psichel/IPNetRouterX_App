@@ -1,0 +1,495 @@
+//
+//  PsClient.m
+//  IPNetMonitorX
+//
+//  Created by psichel on Wed Oct 17 2001.
+//  Copyright (c) 2001 Sustainable Softworks. All rights reserved.
+//
+//  Encapsulates setting up a Distributed Objects (DO) server thread
+//  from an AppKit UI client.
+//
+//  Since Obj-C doesn't have multiple inheritance,
+//  we design this as a stand-alone DO controller class
+//  to be used as a client-server go-between.
+
+#import "PsClient.h"
+#import "PSServer.h"
+#import "IPNetClient.h"
+
+@interface PsClient (PrivateMethods)
+- (Class)serverClass;
+- (id)remoteServer;
+- (id)callbackTarget;		// one-to-one WindowC to client
+- (void)setLastAbortCheck:(NSDate *)value;
+@end
+
+
+@implementation PsClient
+// ---------------------------------------------------------------------------------
+//	¥ init
+// ---------------------------------------------------------------------------------
+- (id) init {
+    if (self = [super init]) {
+		serverClass = nil;
+		remoteServer = nil;
+		callbackTarget = nil;
+		abortFlag = NO;
+		lastAbortCheck = nil;
+		abortTimer = nil;
+    }
+    return self;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ dealloc
+// ---------------------------------------------------------------------------------
+- (void) dealloc {
+	// don't use callbackTarget since we're going away
+	[self setCallbackTarget:nil];
+	// disable other abort paths
+	abortFlag = YES;
+	// cancel abort timer if any
+	[abortTimer invalidate];	abortTimer = nil;
+	[self setLastAbortCheck:nil];
+	// release connection died notification
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	// Don't kill remote server here,
+	// If superclient really wants it gone, it should kill it explicitly
+	//[self killServer];
+	[self setRemoteServer:nil];
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ createNewServer:
+// ---------------------------------------------------------------------------------
+- (BOOL)createNewServerTCP:(NSString *)className
+    // Creates a new RemoteServer object that's running in a different
+    // thread and retains it as our remoteServer element.
+	// Connect using TCP for possible remote control. 
+{
+	BOOL returnValue = NO;
+	do {
+		// check if we have a TCP connection
+		if ([[IPNetClient sharedInstance] connectionCount] == 0) break;
+		// ask remote end to create server object <create://className> and give us a reference to it.
+			// include a local replyTo parameter so we can wait for our answer
+		
+	} while (false);
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ createNewServer:
+// ---------------------------------------------------------------------------------
+- (BOOL)createNewServer:(Class)inClass
+    // Creates a new RemoteServer object that's running in a different
+    // thread and retains it as our remoteServer element  
+{
+    NSPort *port1;
+    NSPort *port2;
+    NSConnection *connectionToServer;
+    NSArray *portArray;
+    long waitCounter;
+
+	// defensive, kill previous server if any
+	if (remoteServer) {
+		[self killServer];
+		// give it a chance to clean up
+		[NSThread  sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.1] ];
+	}
+	// reset abort flag so we don't kill ourselves right away
+	abortFlag = NO;
+	if (inClass) {
+		// First create two new ports and a new NSConnection for sending
+		// and receiving Distributed Object messages through those ports.  We do
+		// this (rather than use attempting to reuse the default NSConnection
+		// that all applications have) because we want the ports to remain
+		// anonymous.  These ports are for talking between our application's
+		// threads only; we don't want them published by name on the network.
+
+		port1 = [NSPort port];
+		port2 = [NSPort port];
+		connectionToServer = [[NSConnection alloc] initWithReceivePort:port1 sendPort:port2];
+ 
+		// Configure the NSConnection
+		[connectionToServer setRequestTimeout:1.5];
+		[connectionToServer setReplyTimeout:2.0];
+		//[connectionToServer enableMultipleThreads];	// configure at other end
+		//[connectionToServer setIndependentConversationQueueing:YES];
+
+		// Now put the two ports in an array and start a new thread, executing
+		// RemoteServer's connectWithPorts: method, with that array as its
+		// argument.  Notice how the ports are reversed here, so RemoteServer's
+		// connectWithPorts connects its send port to our receive port and vice versa.
+
+		portArray = [NSArray arrayWithObjects:port2, port1, nil];
+		[NSThread detachNewThreadSelector:@selector(connectWithPorts:)
+								toTarget:inClass
+								withObject:portArray];
+
+		// Now we wait for the new thread to execute and set the root object at
+		// the other end of the connection.  The loop just spins until this happen.
+		// In theory this is a waste of time, but in practice we never get to increment
+		// waitCounter.
+		
+		waitCounter = 0;
+		while ( [connectionToServer rootProxy] == nil ) {
+			waitCounter += 1;
+			NSAssert( waitCounter < 10000000,
+				@"Server did not set up rootProxy quickly enough ");
+		}
+		if (waitCounter != 0) {
+			NSLog(@"waitCounter=%ld\n", waitCounter);
+		}
+
+		// The following line is an interesting optimisation.  We tell our proxy
+		// to the RemoteServer object about the methods that we're going to
+		// send to the proxy.  This optimises Distributed Object's delivery of
+		// messages.  [Normally when DO encounters a new method, it must first
+		// conduct a transaction with the remote end to find the types for the
+		// arguments of that message.  It then bundles up the method and its
+		// parameters and sends it.  It also caches the response so that following
+		// invokations of that method only take one transaction.  By setting
+		// a protocol for the proxy, you let DO know about the messages in
+		// advance, and avoid it ever having to do two transactions.]
+
+		[ [connectionToServer rootProxy] setProtocolForProxy:@protocol(ThreadFromController)];
+
+		// request to be notified if the connection dies
+		[[NSNotificationCenter defaultCenter] addObserver:self
+			selector:@selector(connectionDidDie:)
+			name:NSConnectionDidDieNotification
+			object:connectionToServer];
+
+		// Now remember the remote server object (actually its proxy) to our caller.
+		[self setRemoteServer:[connectionToServer rootProxy]];
+
+		// Note that at this stage we're bleeding the connectionToRemoteServer
+		// NSConnection object; we're about to destroy our only reference to it.
+		// Well that's not actually true because the our thread's run loop still
+		// has a reference to it.  As we never destroy a thread once we've created it,
+		// we don't really need our own reference to it after this point.
+		//[connectionToServer autorelease];	// ???
+	}
+    return (remoteServer != 0);
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ killServer
+// ---------------------------------------------------------------------------------
+- (void)killServer
+{
+	if (remoteServer) {		// don't allow multiples
+		// tell server to quit the runloop
+		[remoteServer startService:kServerTerminate fromController:self withObject:nil];
+		// don't allow server to delete from under us
+		id server = remoteServer;
+		[[server retain] autorelease];
+		[self setRemoteServer:nil];
+		// clear abort timer if any
+		[abortTimer invalidate];	abortTimer = nil;
+		// release connection died notification
+		[[NSNotificationCenter defaultCenter] removeObserver:self];
+
+		// we invalidate our send port, which will invalidate the connection in the
+		// threaded object, causing its runloop to abort and the thread to exit.
+		// [PAS] Notice this doesn't actually cause the runloop to abort but simply
+		// removes the connection as an input source.  If this is the last input source,
+		// the runloop should abort.
+		// If there are outstanding timers or other active input sources, the runloop will
+		// continue.  In this case we must test for exceptions when sending updates to the
+		// controller and then check if the connection is valid (which is noted when it
+		// attempts to send a message).
+		// [PAS] use external test (mKeepRunning with runMode:beforeDate:) to guard against APE's
+		NSConnection* connect = [(id)server connectionForProxy];
+		[[connect receivePort] invalidate];
+		[[connect sendPort] invalidate];
+		// release the connection, we're done with it
+	//    NSLog(@"%@",[NSString stringWithFormat:@"Connection being disposed, retain count is %02ld\n", [connect retainCount]]);
+		[connect release];
+	}
+}
+
+// ---------------------------------------------------------------------------
+//	¥ connectionDidDie
+// ---------------------------------------------------------------------------
+// override in subclass to attempt further recovery
+- (void)connectionDidDie:(NSNotification *)aNotification
+{
+	// cleanup if connection dies unexpectedly
+	[self killServer];
+	// inform callbackTarget server has finished
+	[self updateParameter:PSAction withObject:PSServerFinishedNotification];
+}
+
+#if 0
+- (void)receiveNotification:(NSNotification *)aNotification
+{
+	// display notification for debug
+	NSLog(@"%@",[aNotification name]);
+	NSBeep();
+}
+#endif
+
+#pragma mark -- client interface --
+// Allow this class to be used as a stand-in for the remote server to isolate DO transactions.
+// By defining a different client, we can replace DO with another mechanism.
+// Catch exceptions to isolate network anomolies.
+//
+// Do not create new servers here since we don't know what kind of
+// connection is desired (unregistered DO, registered DO, unix domain socket)
+// or why it failed.
+// returnValue -1=no remote server; -2=exception during request
+// (Create new server if needed to recover if connection to server fails.)
+// ---------------------------------------------------------------------------
+//	¥ startService:
+// ---------------------------------------------------------------------------
+- (int)startService:(NSString *)inURL withObject:(id)object
+{
+	int returnValue = -1;
+	NS_DURING
+//		if (!remoteServer && !abortFlag) {
+//			[self createNewServer:serverClass];
+//			[NSThread  sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.1] ];
+//		}
+		if (remoteServer) {
+			[remoteServer startService:inURL fromController:self withObject:object];
+			if ([inURL hasPrefix:kServerTerminate]) abortFlag = YES;
+			returnValue = 0;	// service was started
+		}
+		else {
+			NSString* statusInfo = @"No remoteServer for request -startService ";
+			if (inURL) statusInfo = [statusInfo stringByAppendingString:inURL];
+			NSLog(@"%@",statusInfo);
+			[self updateParameter:@"statusInfo" withObject:statusInfo];
+		}
+	NS_HANDLER
+		if (!abortFlag) {
+			NSString* statusInfo = @"Exception during remoteServer -startService ";
+			if (inURL) statusInfo = [statusInfo stringByAppendingString:inURL];
+			NSLog(@"%@",statusInfo);
+			[self updateParameter:@"statusInfo" withObject:statusInfo];
+		}
+		// kill the connection so we create a new one
+		[self killServer];
+		returnValue = -2;
+	NS_ENDHANDLER
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//	¥ synchStartService:
+// ---------------------------------------------------------------------------
+- (int)synchStartService:(NSString *)inURL withObject:(id)object
+{
+	int returnValue = -1;   // generic failure
+	NS_DURING
+//		if (!remoteServer && !abortFlag) {
+//			[self createNewServer:serverClass];
+//			[NSThread  sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:(NSTimeInterval)0.1] ];
+//		}
+		if (remoteServer) {
+			returnValue = [remoteServer synchStartService:inURL fromController:self withObject:object];
+			if ([inURL hasPrefix:kServerTerminate]) abortFlag = YES;
+		}
+		else {
+			NSString* statusInfo = @"No remoteServer for request -synchStartService ";
+			if (inURL) statusInfo = [statusInfo stringByAppendingString:inURL];
+			NSLog(@"%@",statusInfo);
+			[self updateParameter:@"statusInfo" withObject:statusInfo];
+		}
+	NS_HANDLER
+		if (!abortFlag) {
+			NSString* statusInfo = @"Exception during remoteServer -synchStartService ";
+			if (inURL) statusInfo = [statusInfo stringByAppendingString:inURL];
+			NSLog(@"%@",statusInfo);
+			[self updateParameter:@"statusInfo" withObject:statusInfo];
+		}
+		// kill the connection so we create a new one
+		[self killServer];
+		returnValue = -2;
+	NS_ENDHANDLER
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//	¥ updateParameter:withObject:
+// ---------------------------------------------------------------------------
+// convenience method for passing dictionary to callbackTarget
+- (BOOL)updateParameter:(NSString *)name withObject:(id)object
+{
+	NSDictionary* info;
+	if (name && object) {
+		info = [[NSDictionary alloc] initWithObjectsAndKeys:object, name, nil];
+		[callbackTarget receiveDictionary:info];
+		[info release];
+	}
+	return YES;
+}
+
+// ---------------------------------------------------------------------------
+//	¥ abort
+// ---------------------------------------------------------------------------
+// kill server, inform callbackTarget, don't allow multiples
+// return YES if server not already aborted
+- (BOOL)abort {
+	return [self abortWithTimeout:0];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ abortWithTimeout:
+// ---------------------------------------------------------------------------
+// request server to abort, if no response within timeout interval, force it
+// return YES if server not already aborted (timer started)
+- (BOOL)abortWithTimeout:(NSTimeInterval)timeInterval
+{
+	BOOL returnValue = !abortFlag;
+	if (remoteServer && !abortFlag) {   // don't allow multiples to avoid loops or interruptions
+		abortFlag = YES;
+		if (timeInterval == 0) {
+			// tell server to stop
+			[self startService:kServerStop withObject:nil];
+			[abortTimer invalidate];	abortTimer = nil;
+			// kill server immediately
+			[self killServer];
+			// inform callbackTarget server has finished
+			[self updateParameter:PSAction withObject:PSServerFinishedNotification];
+		}
+		else {
+			// tell server to stop
+			[self startService:kServerStop withObject:nil];
+			// wait for server to finish
+			// if no response, kill it
+			[abortTimer invalidate];	abortTimer = nil;
+			abortTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)timeInterval
+				target:self
+				selector:@selector(abortTimeout:)
+				userInfo:nil
+				repeats:NO];
+		}
+	}
+	return returnValue;
+}
+
+// ---------------------------------------------------------------------------
+//	¥ abortTimeout:
+// ---------------------------------------------------------------------------
+// force server to quit if it fails to respond within time interval
+- (void)abortTimeout:(id)timer {
+	[[self retain] autorelease];	// don't allow self to be released before we're through
+	[self killServer];
+	// inform callbackTarget server has finished
+    [self updateParameter:PSAction withObject:PSServerFinishedNotification];
+    //NSBeep();
+}
+
+
+#pragma mark -- <ControllerFromThread> --
+// ---------------------------------------------------------------------------
+//	¥ receiveDictionary:
+// ---------------------------------------------------------------------------
+// update parameters passed in dictionary
+// Catch exceptions since this might be called by DO proxy.
+- (oneway void)receiveDictionary:(NSDictionary *)dictionary
+{
+	// setup autorelease pool so we free any objects used in message processing
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+	@try {
+		[[dictionary retain] autorelease];	// ensure dictionary remains valid even if connection dies
+		if ([[dictionary objectForKey:PSAction] isEqualTo:PSServerFinishedNotification]) {
+			// clear abort timer if any
+			[abortTimer invalidate];	abortTimer = nil;
+			// server runloop was broken by !keepRunning, it's gone
+			//[self killServer];
+			[self setRemoteServer:nil];
+			// release connection died notification
+			[[NSNotificationCenter defaultCenter] removeObserver:self];
+			//NSLog(@"PsClient receiveDictionary PSServerFinishedNotification");
+		}
+		else if ([[dictionary objectForKey:PSAction] isEqualTo:PSReportErrorNotification]) {
+			NSString* text;
+			int code;
+			text = [dictionary objectForKey:@"text"];
+			code = [[dictionary objectForKey:@"code"] intValue];
+			[self updateParameter:@"statusInfo" withObject:text];
+			NSLog(@"%@",text);
+		}
+		// just pass it on to callbackTarget
+		[callbackTarget receiveDictionary:dictionary];
+	}
+	@catch( NSException *theException ) {
+		//[theException printStackTrace];
+		NSString* statusInfo = @"Exception during client receiveDictionary";
+		NSLog(@"%@",statusInfo);
+		[self updateParameter:@"statusInfo" withObject:statusInfo];
+	}
+	[pool release];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ didUserAbort
+// ---------------------------------------------------------------------------
+// Test if user pressed abort or other redirection
+// note value returned (two way).
+- (BOOL)didUserAbort
+{
+	// remember last time this happened as possible watchdog
+	NSDate* now = [[NSDate alloc] initWithTimeIntervalSinceNow:0];
+	[self setLastAbortCheck:now];
+	[now release];
+	return abortFlag;
+}
+
+#pragma mark -- accessors --
+
+// ---------------------------------------------------------------------------------
+//	¥ isConnected
+// ---------------------------------------------------------------------------------
+- (BOOL)isConnected
+{
+	return (remoteServer && !abortFlag);
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ serverClass
+// ---------------------------------------------------------------------------------
+- (Class)serverClass { return serverClass; }
+- (void)setServerClass:(Class)value {
+	serverClass = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ remoteServer
+// ---------------------------------------------------------------------------------
+- (id)remoteServer { return remoteServer; }
+- (void)setRemoteServer:(id)value {
+	[value retain];
+	[remoteServer release];
+	remoteServer = value;
+	// don't abort if new server
+	if (value) abortFlag = NO;
+	else abortFlag = YES;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ callbackTarget
+// ---------------------------------------------------------------------------------
+- (id)callbackTarget { return callbackTarget; }
+- (void)setCallbackTarget:(id)value {
+	//[value retain];
+	//[callbackTarget release];
+	callbackTarget = value;
+}
+
+// ---------------------------------------------------------------------------------
+//	¥ lastAbortCheck
+// ---------------------------------------------------------------------------------
+- (NSDate *)lastAbortCheck { return lastAbortCheck; }
+- (void)setLastAbortCheck:(NSDate *)value {
+	[value retain];
+	[lastAbortCheck release];
+	lastAbortCheck = value;
+}
+@end
+

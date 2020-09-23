@@ -1,0 +1,131 @@
+//
+//  CheckForUpdateC.m
+//  IPNetRouterX
+//
+//  Created by Peter Sichel on Fri May 20 2005.
+//  Copyright (c) 2005 Sustainable Softworks, Inc. All rights reserved.
+//
+//  Check if newer version of software is available from sustworks website.
+
+#import "CheckForUpdateC.h"
+#import "PsClient.h"
+#import "URLAction.h"
+
+@implementation CheckForUpdateC
+- init
+{
+    if (self = [super init]) {
+        // initialize instance vars
+		mURLClient = nil;
+    }
+    return self;
+}
+- (void)dealloc
+{
+	// release any vars we allocated
+	[mURLClient release];   mURLClient = nil;
+    [super dealloc];
+}
+
+- (void)awakeFromNib
+{
+	// Retain ourself so caller can release reference.  Released in windowWillClose:
+	[self retain];	
+	do {
+		// URL Action
+		mURLClient = nil;
+		// get the URL of our MacPAD file
+		NSString* path = [[NSBundle mainBundle] pathForResource:@"MacPAD" ofType:@"url"];
+		if (!path) {
+			[statusInfo setStringValue:@"Inconsistency error, path to MadPAD resource not found"];
+			break;
+		}
+		NSString* urlString = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+
+		// get DO client and server to check for updates in the background
+		if (!mURLClient) {
+			mURLClient = [[PsClient alloc] init];
+			[mURLClient setCallbackTarget:self];
+			[mURLClient setServerClass:[URLAction class]];
+			[mURLClient createNewServer:[URLAction class]];
+		}
+		// request corresponding URL
+		[mURLClient startService:urlString withObject:nil];
+		[statusInfo setStringValue:@"Accessing web for update information..."];
+	} while (false);
+}
+
+- (void)receiveDictionary:(NSDictionary *)dictionary
+{
+	NSData* data = [dictionary objectForKey:kURLData];
+	if ([data length]) {
+		// we read in a MacPAD file
+		[statusInfo setStringValue:@"Data received..."];
+		NSString* str = [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+		NSDictionary* macPAD = [str propertyList];
+		// get release data from web
+		NSString* year = [macPAD objectForKey:@"fileReleaseDateY"];
+		NSString* month = [macPAD objectForKey:@"fileReleaseDateM"];
+		NSString* day = [macPAD objectForKey:@"fileReleaseDateD"];
+		NSString* name = [macPAD objectForKey:@"productName"];
+		NSString* version = [macPAD objectForKey:@"productVersion"];
+		// Info.plist data
+		NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+		NSString* infoYear = [info objectForKey:@"fileReleaseDateY"];
+		NSString* infoMonth = [info objectForKey:@"fileReleaseDateM"];
+		NSString* infoDay = [info objectForKey:@"fileReleaseDateD"];
+		NSString* infoVersion = [info objectForKey:@"CFBundleVersion"];
+		// is web version newer?
+		NSDate* webDate = [[[NSCalendarDate alloc] initWithYear:[year intValue] 
+			month:[month intValue] day:[day intValue] hour:12 minute:0 second:0 
+			timeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]] autorelease];
+		NSDate* infoDate = [[[NSCalendarDate alloc] initWithYear:[infoYear intValue] 
+			month:[infoMonth intValue] day:[infoDay intValue] hour:12 minute:0 second:0 
+			timeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]] autorelease];
+		if ([infoDate compare:webDate] == NSOrderedAscending) {
+			// display new version info
+			[statusInfo setStringValue:[NSString stringWithFormat:
+				@"%@ %@ appears to be newer than the version currently running (%@).",
+				name,version,infoVersion]];
+		}
+		else [statusInfo setStringValue:[NSString stringWithFormat:@"No newer version of %@ was found.",name]];
+	}
+	else {
+		[statusInfo setStringValue:@"There was no response from the network.  Please check your connection settings or try again later."];
+	}
+}
+
+- (void)windowWillClose:(NSNotification *)aNotification
+{
+	// URL action
+	[mURLClient setCallbackTarget:nil];
+	[mURLClient release];   mURLClient = nil;
+    NSWindow* theWindow;
+    
+    // remember window frame
+    theWindow = [aNotification object];
+    [theWindow saveFrameUsingName:kCheckForUpdateName];
+
+    [self autorelease];
+}
+
+- (IBAction)dismiss:(id)sender
+{
+	[self close];
+}
+
+- (IBAction)download:(id)sender
+{
+	NSURL *downloadURL;
+	NSString *urlStr;
+#if IPNetRouter
+	urlStr = @"http://www.sustworks.com/site/downloads.html#IPNetRouterX";
+#else
+	urlStr = @"http://www.sustworks.com/site/downloads.html#IPNetSentryX";
+#endif
+	if ((downloadURL = [NSURL URLWithString:urlStr])) {
+		[[NSWorkspace sharedWorkspace] openURL:downloadURL];
+	}
+}
+
+@end

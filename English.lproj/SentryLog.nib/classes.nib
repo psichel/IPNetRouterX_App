@@ -1,0 +1,13 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {query = id; }; 
+            CLASS = FingerController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {outputText = id; scrollView = NSScrollView; }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}

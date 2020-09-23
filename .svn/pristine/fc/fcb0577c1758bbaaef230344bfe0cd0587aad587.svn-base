@@ -1,0 +1,53 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {"" = id; myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {hostNameAddButton = id; hostNameRemoveButton = id; }; 
+            CLASS = HostNamesDS; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {hostNamesTableView = NSTableView; localNetworksTableView = NSTableView; }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            CLASS = LocalNetworksDS; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {hostNamesTableView = NSTableView; }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {
+            ACTIONS = {
+                applyButton = id; 
+                fillInTemplateButton = id; 
+                resetToDefaultButton = id; 
+                revertButton = id; 
+                saveButton = id; 
+                showLog = id; 
+                startButton = id; 
+                templateFilePopUp = id; 
+            }; 
+            CLASS = NameServiceWC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                applyButton = NSButton; 
+                hostNamesTableView = NSTableView; 
+                localNetworksTableView = NSTableView; 
+                nameServerState = NSTextField; 
+                revertButton = NSButton; 
+                saveButton = NSButton; 
+                startButton = NSButton; 
+                stateDescription = NSTextField; 
+                statusInfo = NSTextField; 
+                tabView = NSTabView; 
+                templateFilePopUp = NSPopUpButton; 
+                templateView = NSTextView; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

@@ -1,0 +1,61 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {"" = id; myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = NSDatePicker; LANGUAGE = ObjC; SUPERCLASS = NSControl; }, 
+        {CLASS = NSSegmentedControl; LANGUAGE = ObjC; SUPERCLASS = NSControl; }, 
+        {CLASS = PSNumberFormatter; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            CLASS = PSPlotView; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                scaleMidR = NSTextField; 
+                scaleMidT = NSTextField; 
+                scaleTopR = NSTextField; 
+                scaleTopT = NSTextField; 
+            }; 
+            SUPERCLASS = NSView; 
+        }, 
+        {
+            ACTIONS = {
+                dateField = id; 
+                deviceButton = id; 
+                intervalPopUp = id; 
+                netflowButton = id; 
+                plotType = id; 
+                serviceButton = id; 
+                showNowButton = id; 
+                stepForward = id; 
+                stepGo = id; 
+                stepReverse = id; 
+                trafficDiscoveryOn = id; 
+                viewByPopUp = id; 
+            }; 
+            CLASS = TrafficDiscoveryWC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                bytePlotView = PSPlotView; 
+                dateField = NSTextField; 
+                deviceButton = NSButton; 
+                intervalPopUp = NSPopUpButton; 
+                netflowButton = NSButton; 
+                numberField = NSTextField; 
+                plotType = NSPopUpButton; 
+                serviceButton = NSButton; 
+                showNowButton = NSButton; 
+                stepForward = NSButton; 
+                stepGo = NSButton; 
+                stepReverse = NSButton; 
+                tableView = NSTableView; 
+                trafficDiscoveryOn = NSButton; 
+                viewByPopUp = NSPopUpButton; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

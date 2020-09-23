@@ -1,0 +1,182 @@
+//
+//  PSHostDictionary.m
+//  IPNetMonitorX
+//
+//  Created by Peter Sichel on Sun Jan 4 2004.
+//  Copyright (c) 2004 Sustainable Softworks. All rights reserved.
+
+#import "PSHostDictionary.h"
+#import "IPHost.h"
+#import "NSDate_Extensions.h"
+#import "HardwareAddress.h"
+#import "PSSupport.h"
+
+@implementation PSHostDictionary
++ (PSHostDictionary *) sharedInstance {
+	static id sharedTask = nil;
+	
+	if(sharedTask==nil) {
+		sharedTask = [[PSHostDictionary alloc] init];
+	}
+	return sharedTask;
+}
+
+// ---------------------------------------------------------------------------
+//  ¥ init
+// ---------------------------------------------------------------------------
+- init
+{
+    if (self = [super init]) {
+        hostNames = [[NSMutableDictionary alloc] init];
+		discoveredServices = [[NSMutableArray alloc] init];
+		afpServiceBrowser = nil;
+		httpServiceBrowser= nil;
+		lastUpdate = nil;
+		inProgress = NO;
+    }
+    return self;
+}
+- (void)dealloc
+{
+    [afpServiceBrowser setDelegate:nil];
+	[afpServiceBrowser release];	afpServiceBrowser = nil;
+	[httpServiceBrowser setDelegate:nil];
+    [httpServiceBrowser release];   httpServiceBrowser = nil;
+	[hostNames release];			hostNames = nil;
+	// discoveredServices setDelegate:nil for each element?
+	[discoveredServices release];   discoveredServices = nil;
+	[lastUpdate release];			lastUpdate = nil;
+    [super dealloc];
+}
+
+// ---------------------------------------------------------------------------
+//	¥ hostNameForAddress
+// ---------------------------------------------------------------------------
+//  look for name in dictionary
+- (NSString *)hostNameForAddress:(NSString *)address
+{
+    NSString* returnValue = [hostNames objectForKey:address];
+    return returnValue;
+}
+
+- (NSDictionary *)hostNames { return hostNames; }
+
+// ---------------------------------------------------------------------------
+//	¥ startUpdate
+// ---------------------------------------------------------------------------
+// Use NSNetBrowser for look for host names that offer AFP
+- (void)startUpdate
+{
+	if (!inProgress) {  // don't allow multiples
+		// allocate browser if needed
+		if (!afpServiceBrowser) {
+			afpServiceBrowser = [[NSNetServiceBrowser alloc] init];
+			[afpServiceBrowser setDelegate:self];
+		}
+		if (!httpServiceBrowser) {
+			httpServiceBrowser = [[NSNetServiceBrowser alloc] init];
+			[httpServiceBrowser setDelegate:self];
+		}
+		[lastUpdate release];
+		lastUpdate = [[NSDate psDate] retain];
+		
+		[afpServiceBrowser searchForServicesOfType:@"_afpovertcp._tcp." inDomain:@""];
+		[httpServiceBrowser searchForServicesOfType:@"_http._tcp." inDomain:@""];
+		inProgress = YES;
+	}
+}
+- (void)stopUpdate
+{
+	if (afpServiceBrowser) [afpServiceBrowser stop];
+	if (httpServiceBrowser) [httpServiceBrowser stop];
+}
+
+#pragma mark --- delegate methods ---
+// searchstarted
+- (void)netServiceBrowserWillSearch:(NSNetServiceBrowser *)aNetServiceBrowser
+{
+	inProgress = YES;
+}
+
+// search stopped
+- (void)netServiceBrowserDidStopSearch:(NSNetServiceBrowser *)aNetServiceBrowser
+{
+	inProgress = NO;
+}
+
+// search not started because...
+- (void)netServiceBrowser:(NSNetServiceBrowser *)aNetServiceBrowser didNotSearch:(NSDictionary *)errorDict
+{
+	id errorCode = [errorDict objectForKey:NSNetServicesErrorCode];
+	switch ([errorCode intValue]) {
+		case NSNetServicesUnknownError:
+			NSLog(@"NSNetServicesUnknownError");
+			break;
+		case NSNetServicesCollisionError:
+			NSLog(@"NSNetServicesCollisionError");
+			break;
+		case NSNetServicesNotFoundError:
+			NSLog(@"NSNetServicesNotFoundError");
+			break;
+		case NSNetServicesActivityInProgress:
+			NSLog(@"NSNetServicesActivityInProgress");
+			break;
+		case NSNetServicesBadArgumentError:
+			NSLog(@"NSNetServicesBadArgumentError");
+			break;
+		case NSNetServicesCancelledError:
+			NSLog(@"NSNetServicesCancelledError");
+			break;
+		case NSNetServicesInvalidError:
+			NSLog(@"NSNetServicesInvalidError");
+			break;
+		default:
+			NSLog([errorCode description]);
+	}
+	inProgress = NO;
+}
+
+// found a service, add to array
+- (void)netServiceBrowser:(NSNetServiceBrowser *)aNetServiceBrowser didFindService:(NSNetService *)aNetService moreComing:(BOOL)moreComing
+{
+    [discoveredServices addObject:aNetService];
+	[aNetService setDelegate:self];
+	[aNetService resolveWithTimeout:5];
+}
+
+// resolved an address, add to dictionary
+- (void)netServiceDidResolveAddress:(NSNetService *)sender
+{
+	IPHost* host;
+	NSString* name;
+	NSData* addressData;
+	NSArray* addressList;
+	NSEnumerator* en;
+	NSString* ipAddress;
+	NSString* macAddress;
+	
+	host = [[[IPHost alloc] init] autorelease];
+	name = [sender name];
+	addressList = [sender addresses];
+	en = [addressList objectEnumerator];
+	while (addressData = [en nextObject]) {
+		if ([host setSocketAddress:(sockaddr_t *)[addressData bytes] size:[addressData length]]) {
+			ipAddress = [host addressString];
+			if (ipAddress) [hostNames setObject:name forKey:ipAddress];
+			macAddress = hwAddressStringForIPString(ipAddress);
+			if (macAddress) [hostNames setObject:name forKey:macAddress];
+		}
+	}
+}
+
+// removed a service, remove from dictionary
+- (void)netServiceBrowser:(NSNetServiceBrowser *)aNetServiceBrowser didRemoveService:(NSNetService *)aNetService moreComing:(BOOL)moreComing
+{
+	NSArray* keys = [hostNames allKeysForObject:[aNetService name]];
+	if ([keys count]) [hostNames removeObjectForKey:[keys objectAtIndex:0]];
+	[discoveredServices removeObject:aNetService];
+}
+
+@end
+
+

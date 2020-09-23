@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Description</key>
+	<string>IPNetRouterX</string>
+	<key>Messages</key>
+	<dict>
+		<key>start</key>
+		<string>Starting IPNetRouterX Services</string>
+		<key>stop</key>
+		<string>Stopping IPNetRouterX Services</string>
+	</dict>
+	<key>OrderPreference</key>
+	<string>Last</string>
+	<key>Provides</key>
+	<array>
+		<string>Firewall</string>
+		<string>NAT</string>
+		<string>Router</string>
+	</array>
+	<key>Requires</key>
+	<array>
+		<string>NetworkExtensions</string>
+	</array>
+	<key>Uses</key>
+	<array>
+		<string>NetworkExtensions</string>
+	</array>
+</dict>
+</plist>

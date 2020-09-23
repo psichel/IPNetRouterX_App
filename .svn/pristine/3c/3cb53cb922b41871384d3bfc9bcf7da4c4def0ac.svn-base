@@ -1,0 +1,35 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {myHelp = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = IPValueFormatter; LANGUAGE = ObjC; SUPERCLASS = NSFormatter; }, 
+        {
+            ACTIONS = {
+                addressChange = id; 
+                hostStep = id; 
+                myHelp = id; 
+                networkStep = id; 
+                prefixLengthStep = id; 
+            }; 
+            CLASS = SubnetController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                classField = NSTextField; 
+                hostField = NSTextField; 
+                hostStepper = NSStepper; 
+                ipAddressCombo = NSComboBox; 
+                maskField = NSTextField; 
+                networkField = NSTextField; 
+                networkStepper = NSStepper; 
+                prefixLengthField = NSTextField; 
+                prefixLengthStepper = NSStepper; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }
+    ); 
+    IBVersion = 1; 
+}

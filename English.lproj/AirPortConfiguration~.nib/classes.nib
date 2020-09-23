@@ -1,0 +1,28 @@
+{
+    IBClasses = (
+        {
+            ACTIONS = {apply = id; myHelp = id; }; 
+            CLASS = AirPortConfigurationWindowC; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                apMode = NSPopUpButton; 
+                channel = NSPopUpButton; 
+                confirm = NSSecureTextField; 
+                encryptionType = NSPopUpButton; 
+                networkName = NSTextField; 
+                password = NSSecureTextField; 
+                portType = NSPopUpButton; 
+                restoreCB = NSButton; 
+                statusInfo = NSTextField; 
+            }; 
+            SUPERCLASS = NSWindowController; 
+        }, 
+        {
+            ACTIONS = {"" = id; }; 
+            CLASS = FirstResponder; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSObject; 
+        }
+    ); 
+    IBVersion = 1; 
+}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>0</key>
+	<string>echo reply</string>
+	<key>11</key>
+	<string>time exceeded</string>
+	<key>12</key>
+	<string>parameter problem</string>
+	<key>3</key>
+	<string>destination unreachable</string>
+	<key>4</key>
+	<string>source quench</string>
+	<key>5</key>
+	<string>redirect</string>
+	<key>8</key>
+	<string>echo request</string>
+</dict>
+</plist>

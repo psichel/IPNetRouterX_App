@@ -1,0 +1,16 @@
+;-----------------------------------------------------------------------------
+; lan.zone - used to define names for hosts on your local LAN.
+;-----------------------------------------------------------------------------
+$TTL	86400
+$ORIGIN lan.			;IPNR_origin;
+@  IN SOA  gateway.lan. root.lan.  (				;IPNR_SOA;
+				   2006092900	;IPNR_serial; YYYYMMDDxx
+                   1h			; refresh after 1 hour
+                   15m			; retry after 15 minutes
+                   1w			; expire after 1 week
+                   1h )			; minimum TTL of 1 hour
+					
+                          IN NS   gateway.lan.      ;IPNR_NS;
+gateway.lan.              IN A    192.168.0.1       ;IPNR_A; The name server box
+myhostname.lan.           IN A    192.168.0.2       ;IPNR_A; A host on your LAN
+;IPNR_A; A record place-holder (define names for hosts on your LAN)
